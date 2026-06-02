@@ -27,8 +27,10 @@ import type { ReactNode } from "react";
 import { answerQuestion, buildCoachReport } from "./analysis/advisor";
 import { buildDataQualityReport } from "./analysis/dataQuality";
 import { topFits } from "./analysis/scoring";
+import { buildSquadBriefing } from "./analysis/squadBriefing";
 import { sampleExport } from "./data/sampleExport";
 import { parseFiles } from "./parsers/fmExport";
+import type { BriefingItem, DepthBand } from "./analysis/squadBriefing";
 import type { ChatMessage, ImportBatch, Player } from "./types/domain";
 
 const STORAGE_KEY = "fm-coach:batch";
@@ -71,6 +73,7 @@ export default function App() {
   const players = batch?.players ?? [];
   const report = useMemo(() => buildCoachReport(players), [players]);
   const quality = useMemo(() => buildDataQualityReport(batch), [batch]);
+  const briefing = useMemo(() => buildSquadBriefing(players), [players]);
   const selectedPlayer = players.find((player) => player.id === selectedId);
   const selectedFits = selectedPlayer ? topFits(selectedPlayer, 3) : [];
   const filteredPlayers = useMemo(() => filterPlayers(players, query), [players, query]);
@@ -318,6 +321,50 @@ export default function App() {
 
         <div className="desk-grid">
           <section className="main-column">
+            <section className="panel briefing-panel">
+              <div className="section-head">
+                <div>
+                  <div className="panel-title compact">
+                    <Sparkles size={18} />
+                    <h2>오늘의 브리핑</h2>
+                  </div>
+                  <p>{briefing.summary}</p>
+                </div>
+                <div className="readiness-ring">
+                  <strong>{briefing.readiness}</strong>
+                  <span>준비도</span>
+                </div>
+              </div>
+
+              <div className="briefing-layout">
+                <div className="briefing-lead">
+                  <strong>{briefing.headline}</strong>
+                  <div className="next-action-list">
+                    {briefing.nextActions.map((item) => (
+                      <BriefingAction item={item} key={`${item.title}-${item.detail}`} />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="depth-board" aria-label="포지션 뎁스">
+                  {briefing.depth.map((band) => (
+                    <DepthCard band={band} key={band.id} />
+                  ))}
+                </div>
+
+                <div className="key-player-list">
+                  <span className="mini-heading">핵심 선수</span>
+                  {briefing.keyPlayers.slice(0, 4).map(({ player, fit }) => (
+                    <button className="key-player" key={player.id} onClick={() => setSelectedId(player.id)}>
+                      <span>{player.name}</span>
+                      <strong>{fit.score}</strong>
+                    </button>
+                  ))}
+                  {briefing.keyPlayers.length === 0 && <p className="muted">핵심 선수 분석 대기 중</p>}
+                </div>
+              </div>
+            </section>
+
             <section className="panel squad-board">
               <div className="section-head">
                 <div>
@@ -564,6 +611,32 @@ function ReportPanel({ icon, title, children }: { icon: ReactNode; title: string
   );
 }
 
+function DepthCard({ band }: { band: DepthBand }) {
+  const ratio = band.minimum > 0 ? Math.min(band.count / band.minimum, 1) : 0;
+
+  return (
+    <div className={`depth-card ${band.status}`}>
+      <div className="depth-top">
+        <strong>{band.label}</strong>
+        <span>{band.count}/{band.minimum}</span>
+      </div>
+      <div className="depth-meter" aria-hidden="true">
+        <span style={{ width: `${ratio * 100}%` }} />
+      </div>
+      <small>{depthStatusLabel(band.status)}</small>
+    </div>
+  );
+}
+
+function BriefingAction({ item }: { item: BriefingItem }) {
+  return (
+    <div className={`briefing-action ${item.severity}`}>
+      <span>{item.title}</span>
+      <p>{item.detail}</p>
+    </div>
+  );
+}
+
 function StatusPill({ connected, label }: { connected: boolean; label: string }) {
   return (
     <span className={`status-pill ${connected ? "connected" : "offline"}`}>
@@ -571,6 +644,19 @@ function StatusPill({ connected, label }: { connected: boolean; label: string })
       {label}
     </span>
   );
+}
+
+function depthStatusLabel(status: DepthBand["status"]): string {
+  if (status === "deep") {
+    return "충분";
+  }
+  if (status === "ok") {
+    return "적정";
+  }
+  if (status === "thin") {
+    return "얇음";
+  }
+  return "비어 있음";
 }
 
 function qualityStatusLabel(status: ReturnType<typeof buildDataQualityReport>["status"]): string {

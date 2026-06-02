@@ -1,8 +1,6 @@
 import { attributeLabel } from "./attributeCatalog";
 import { roleDefinitions } from "./roleDefinitions";
-import type { AttributeKey, Player, RoleDefinition, RoleFit } from "../types/domain";
-
-export type PositionGroup = RoleDefinition["family"] | "unknown";
+import type { AttributeKey, Player, PositionGroup, RoleDefinition, RoleFamily, RoleFit } from "../types/domain";
 
 export function scorePlayerForRole(player: Player, role: RoleDefinition): RoleFit {
   const entries = Object.entries(role.weights) as Array<[AttributeKey, number]>;
@@ -63,17 +61,32 @@ export function positionGroup(position: string): PositionGroup {
 
 export function positionGroups(position: string): PositionGroup[] {
   const value = normalizePositionText(position);
-  const groups = new Set<RoleDefinition["family"]>();
+  const groups = new Set<Exclude<PositionGroup, "unknown">>();
 
   if (matchesAny(value, [/\bGK\b/])) groups.add("goalkeeper");
   if (matchesAny(value, [/\bD\s*C\b/, /\bDC\b/, /\bCB\b/])) groups.add("centerBack");
-  if (matchesAny(value, [/\bD\s*[LR]\b/, /\bD[LR]\b/, /\bFB\s*[LR]\b/, /\bFB[LR]\b/])) groups.add("fullBack");
-  if (matchesAny(value, [/\bWB\s*[LR]\b/, /\bWB[LR]\b/])) groups.add("wingBack");
+  if (matchesAny(value, [/\bD\s*L\b/, /\bDL\b/, /\bFB\s*L\b/, /\bFBL\b/, /\bWB\s*L\b/, /\bWBL\b/])) groups.add("leftBack");
+  if (matchesAny(value, [/\bD\s*R\b/, /\bDR\b/, /\bFB\s*R\b/, /\bFBR\b/, /\bWB\s*R\b/, /\bWBR\b/])) groups.add("rightBack");
   if (matchesAny(value, [/\bDM\b/, /\bM\s*C\b/, /\bMC\b/, /\bAM\s*[CLR]\b/, /\bAM[CLR]\b/])) groups.add("midfielder");
-  if (matchesAny(value, [/\bM\s*[LR]\b/, /\bM[LR]\b/, /\bW\s*[LR]\b/, /\bW[LR]\b/])) groups.add("wing");
+  if (matchesAny(value, [/\bM\s*L\b/, /\bML\b/, /\bW\s*L\b/, /\bWL\b/])) groups.add("leftWing");
+  if (matchesAny(value, [/\bM\s*R\b/, /\bMR\b/, /\bW\s*R\b/, /\bWR\b/])) groups.add("rightWing");
   if (matchesAny(value, [/\bST\b/, /\bS\s*C\b/, /\bSC\b/])) groups.add("attacker");
 
   return groups.size > 0 ? [...groups] : ["unknown"];
+}
+
+export function positionCoversRoleFamily(position: string, family: RoleFamily): boolean {
+  return positionGroups(position).some((group) => roleFamilyCoversPositionGroup(family, group));
+}
+
+export function roleFamilyCoversPositionGroup(family: RoleFamily, group: PositionGroup): boolean {
+  if (family === "sideBack") {
+    return group === "leftBack" || group === "rightBack";
+  }
+  if (family === "wing") {
+    return group === "leftWing" || group === "rightWing";
+  }
+  return family === group;
 }
 
 function matchesPosition(playerPosition: string, rolePositions: string[]): boolean {

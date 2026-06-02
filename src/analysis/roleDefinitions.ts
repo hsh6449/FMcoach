@@ -51,8 +51,8 @@ export const roleDefinitions: RoleDefinition[] = [
   {
     id: "fb-su",
     name: "Full Back",
-    family: "fullBack",
-    positions: ["D L", "D R", "DL", "DR", "FB L", "FB R"],
+    family: "sideBack",
+    positions: ["D L", "D R", "DL", "DR", "FB L", "FB R", "FBL", "FBR", "WB L", "WB R", "WBL", "WBR"],
     weights: {
       tackling: 0.9,
       marking: 0.8,
@@ -67,8 +67,8 @@ export const roleDefinitions: RoleDefinition[] = [
   {
     id: "iwb-su",
     name: "Inverted Wing Back",
-    family: "fullBack",
-    positions: ["D L", "D R", "DL", "DR", "FB L", "FB R"],
+    family: "sideBack",
+    positions: ["D L", "D R", "DL", "DR", "FB L", "FB R", "FBL", "FBR", "WB L", "WB R", "WBL", "WBR"],
     weights: {
       passing: 1,
       decisions: 1,
@@ -83,8 +83,8 @@ export const roleDefinitions: RoleDefinition[] = [
   {
     id: "wb-su",
     name: "Wing Back",
-    family: "wingBack",
-    positions: ["WB L", "WB R", "WBL", "WBR"],
+    family: "sideBack",
+    positions: ["D L", "D R", "DL", "DR", "FB L", "FB R", "FBL", "FBR", "WB L", "WB R", "WBL", "WBR"],
     weights: {
       crossing: 1,
       dribbling: 0.8,

@@ -67,10 +67,23 @@ export type ImportBatch = {
   warnings: string[];
 };
 
+export type RoleFamily = "goalkeeper" | "centerBack" | "sideBack" | "midfielder" | "wing" | "attacker";
+
+export type PositionGroup =
+  | "goalkeeper"
+  | "centerBack"
+  | "leftBack"
+  | "rightBack"
+  | "midfielder"
+  | "leftWing"
+  | "rightWing"
+  | "attacker"
+  | "unknown";
+
 export type RoleDefinition = {
   id: string;
   name: string;
-  family: "goalkeeper" | "centerBack" | "fullBack" | "wingBack" | "midfielder" | "wing" | "attacker";
+  family: RoleFamily;
   positions: string[];
   weights: Partial<Record<AttributeKey, number>>;
 };

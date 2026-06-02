@@ -1,4 +1,4 @@
-import { positionGroups, topFits } from "./scoring";
+import { positionCoversRoleFamily, topFits } from "./scoring";
 import type { Player, RoleFit } from "../types/domain";
 
 export type TargetRecommendation = {
@@ -66,7 +66,7 @@ function bestIncumbentForFit(squad: Player[], fit: RoleFit): Player | undefined 
       const comparableFit = topFits(player, 5).find((item) => item.roleId === fit.roleId) ?? topFits(player, 1)[0];
       return { player, fit: comparableFit };
     })
-    .filter((item) => item.fit.family === fit.family || positionGroups(item.player.position).includes(fit.family))
+    .filter((item) => item.fit.family === fit.family || positionCoversRoleFamily(item.player.position, fit.family))
     .sort((a, b) => b.fit.score - a.fit.score)[0]?.player;
 }
 

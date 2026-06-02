@@ -1002,7 +1002,7 @@ p {
   }
 
   .depth-board {
-    grid-template-columns: repeat(7, minmax(84px, 1fr));
+    grid-template-columns: repeat(8, minmax(84px, 1fr));
     overflow-x: auto;
   }
 }

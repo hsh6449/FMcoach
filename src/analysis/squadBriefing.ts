@@ -1,8 +1,10 @@
 import { positionGroups, topFits } from "./scoring";
-import type { Player, RoleDefinition, RoleFit } from "../types/domain";
+import type { Player, PositionGroup, RoleFit } from "../types/domain";
+
+type DepthGroup = Exclude<PositionGroup, "unknown">;
 
 export type DepthBand = {
-  id: RoleDefinition["family"];
+  id: DepthGroup;
   label: string;
   count: number;
   minimum: number;
@@ -26,13 +28,14 @@ export type SquadBriefing = {
   nextActions: BriefingItem[];
 };
 
-const DEPTH_CONFIG: Array<{ id: RoleDefinition["family"]; label: string; minimum: number }> = [
+const DEPTH_CONFIG: Array<{ id: DepthGroup; label: string; minimum: number }> = [
   { id: "goalkeeper", label: "GK", minimum: 2 },
   { id: "centerBack", label: "CB", minimum: 4 },
-  { id: "fullBack", label: "FB", minimum: 2 },
-  { id: "wingBack", label: "WB", minimum: 2 },
+  { id: "leftBack", label: "LB", minimum: 2 },
+  { id: "rightBack", label: "RB", minimum: 2 },
   { id: "midfielder", label: "CM", minimum: 5 },
-  { id: "wing", label: "Wing", minimum: 2 },
+  { id: "leftWing", label: "LW", minimum: 2 },
+  { id: "rightWing", label: "RW", minimum: 2 },
   { id: "attacker", label: "ST", minimum: 2 }
 ];
 

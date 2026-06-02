@@ -36,6 +36,9 @@
 - Add a retrieval layer over the local normalized database.
 - Send only relevant player/stat snippets to the model.
 - Require every recommendation to cite the local fields it used.
+- Use `docs/AI_COACH_PLAYBOOK.md` as the in-context role/tactical guide for Codex or a future API model.
+- Analyze role fit as a network: focal player, supporting roles, unit strengths/weaknesses, and tactical risk.
+- Include height, weight, preferred foot, player traits, personality/media handling, and hidden attributes when exported.
 
 ## Phase 6: FMF Lab
 

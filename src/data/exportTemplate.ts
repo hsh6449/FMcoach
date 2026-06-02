@@ -91,7 +91,40 @@ const physicalAttributes: AttributeKey[] = [
   "strength"
 ];
 
+const profileColumns = [
+  "Name",
+  "Position",
+  "Age",
+  "Height",
+  "Weight",
+  "Preferred Foot",
+  "Personality",
+  "Media Handling",
+  "Player Traits",
+  "Condition",
+  "Match Sharpness",
+  "Average Rating"
+];
+
+const hiddenColumns = [
+  "Adaptability",
+  "Ambition",
+  "Consistency",
+  "Important Matches",
+  "Injury Proneness",
+  "Pressure",
+  "Professionalism",
+  "Temperament",
+  "Versatility"
+];
+
 export const exportTemplateGroups: ExportTemplateGroup[] = [
+  {
+    id: "profile",
+    label: "선수 프로필",
+    description: "역할 판단에 필요한 신체/주발/성격/선플 영역입니다.",
+    columns: profileColumns
+  },
   {
     id: "technical",
     label: "기술적 능력",
@@ -109,6 +142,12 @@ export const exportTemplateGroups: ExportTemplateGroup[] = [
     label: "신체적 능력",
     description: "FM 선수 프로필의 Physical 영역입니다.",
     columns: physicalAttributes.map((key) => attributeLabels[key])
+  },
+  {
+    id: "hidden",
+    label: "히든/성향",
+    description: "보이는 export나 외부 도구에서 얻을 수 있을 때만 사용합니다.",
+    columns: hiddenColumns
   }
 ];
 

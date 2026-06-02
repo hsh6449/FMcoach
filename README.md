@@ -117,3 +117,7 @@ OCR should stay as a context sensor only. It can identify the currently viewed p
 - Add LLM-backed responses with cited local data snippets.
 - Add OCR context detection for current player/team names.
 - Add experimental FMF readers for tactic/view/shortlist files.
+
+## AI Coach Playbook
+
+The LLM layer should use `docs/AI_COACH_PLAYBOOK.md` as its in-context tactical guide. The intended model is not pure AI guesswork: local data produces role/tactical evidence, and the AI explains how the player should be used, which teammates should support him, and where the squad structure creates risk.

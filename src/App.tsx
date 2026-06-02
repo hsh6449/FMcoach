@@ -392,7 +392,7 @@ export default function App() {
                     </div>
                     <button className="mini-action-button" onClick={copyTemplateColumns}>
                       {templateCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
-                      {templateCopied ? "복사됨" : "능력치 복사"}
+                      {templateCopied ? "복사됨" : "분석 컬럼 복사"}
                     </button>
                   </div>
                   <div className="prep-steps">
@@ -649,10 +649,34 @@ export default function App() {
                 <div className="player-card">
                   <h3>{selectedPlayer.name}</h3>
                   <p>{selectedPlayer.position || "포지션 미상"} · {selectedPlayer.age ? `${selectedPlayer.age}세` : "나이 미상"}</p>
-                  <div className="mini-grid">
+                  <div className="mini-grid player-profile-grid">
+                    <span>키/체중 <strong>{[selectedPlayer.height, selectedPlayer.weight].filter(Boolean).join(" / ") || "-"}</strong></span>
+                    <span>주발 <strong>{selectedPlayer.preferredFoot ?? "-"}</strong></span>
+                    <span>성격 <strong>{selectedPlayer.personality ?? "-"}</strong></span>
+                    <span>미디어 <strong>{selectedPlayer.mediaHandling ?? "-"}</strong></span>
                     <span>컨디션 <strong>{selectedPlayer.condition ? `${selectedPlayer.condition}%` : "-"}</strong></span>
                     <span>평점 <strong>{selectedPlayer.averageRating ?? "-"}</strong></span>
                   </div>
+                  {selectedPlayer.preferredMoves && selectedPlayer.preferredMoves.length > 0 && (
+                    <div className="trait-panel">
+                      <strong>선호 플레이</strong>
+                      <div className="template-chip-list">
+                        {selectedPlayer.preferredMoves.map((move) => (
+                          <span key={move}>{move}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedPlayer.hiddenAttributes && Object.keys(selectedPlayer.hiddenAttributes).length > 0 && (
+                    <div className="trait-panel">
+                      <strong>히든/성향</strong>
+                      <div className="template-chip-list">
+                        {Object.entries(selectedPlayer.hiddenAttributes).map(([key, value]) => (
+                          <span key={key}>{hiddenAttributeLabel(key)} {value}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="fit-list">
                     {selectedFits.map((fit) => (
                       <div className="fit-row" key={fit.roleId}>
@@ -779,6 +803,26 @@ function StatusPill({ connected, label }: { connected: boolean; label: string })
       {label}
     </span>
   );
+}
+
+function hiddenAttributeLabel(key: string): string {
+  const labels: Record<string, string> = {
+    adaptability: "적응력",
+    ambition: "야망",
+    consistency: "꾸준함",
+    controversy: "논쟁성",
+    dirtiness: "반칙성",
+    importantMatches: "중요 경기",
+    injuryProneness: "부상 빈도",
+    loyalty: "충성심",
+    pressure: "압박감",
+    professionalism: "프로의식",
+    sportsmanship: "스포츠맨십",
+    temperament: "참을성",
+    versatility: "다재다능"
+  };
+
+  return labels[key] ?? key;
 }
 
 function depthStatusLabel(status: DepthBand["status"]): string {

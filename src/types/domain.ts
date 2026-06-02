@@ -38,6 +38,23 @@ export type AttributeKey =
 
 export type AttributeMap = Partial<Record<AttributeKey, number>>;
 
+export type HiddenAttributeKey =
+  | "adaptability"
+  | "ambition"
+  | "consistency"
+  | "controversy"
+  | "dirtiness"
+  | "importantMatches"
+  | "injuryProneness"
+  | "loyalty"
+  | "pressure"
+  | "professionalism"
+  | "sportsmanship"
+  | "temperament"
+  | "versatility";
+
+export type HiddenAttributeMap = Partial<Record<HiddenAttributeKey, number>>;
+
 export type Player = {
   id: string;
   name: string;
@@ -45,9 +62,13 @@ export type Player = {
   age?: number;
   club?: string;
   nationality?: string;
+  height?: string;
+  weight?: string;
+  preferredFoot?: string;
   value?: string;
   wage?: string;
   personality?: string;
+  mediaHandling?: string;
   morale?: string;
   condition?: number;
   sharpness?: number;
@@ -56,6 +77,8 @@ export type Player = {
   assists?: number;
   minutes?: number;
   averageRating?: number;
+  preferredMoves?: string[];
+  hiddenAttributes?: HiddenAttributeMap;
   attributes: AttributeMap;
   raw: Record<string, string>;
 };

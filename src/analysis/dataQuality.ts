@@ -30,6 +30,7 @@ export type DataQualityReport = {
 
 const REQUIRED_FIELDS = ["name", "position"] as const;
 const IMPORTANT_FIELDS = ["age", "value", "wage", "condition", "sharpness", "averageRating"] as const;
+const COACH_CONTEXT_FIELDS = ["height", "weight", "preferredFoot", "personality", "mediaHandling", "preferredMoves"] as const;
 const CORE_ATTRIBUTES: AttributeKey[] = [
   "passing",
   "technique",
@@ -61,7 +62,7 @@ export function buildDataQualityReport(batch: ImportBatch | undefined): DataQual
     };
   }
 
-  const fieldCoverage = [...REQUIRED_FIELDS, ...IMPORTANT_FIELDS].map((field) => coverageForField(players, field));
+  const fieldCoverage = [...REQUIRED_FIELDS, ...IMPORTANT_FIELDS, ...COACH_CONTEXT_FIELDS].map((field) => coverageForField(players, field));
   const attributeCoverage = attributeCatalog.map((attribute) => ({
     key: attribute.key,
     label: attribute.label,
@@ -90,6 +91,12 @@ export function buildDataQualityReport(batch: ImportBatch | undefined): DataQual
 function coverageForField(players: Player[], field: keyof Player): FieldCoverage {
   const filled = players.filter((player) => {
     const value = player[field];
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    if (value && typeof value === "object") {
+      return Object.keys(value).length > 0;
+    }
     return value !== undefined && value !== null && value !== "";
   }).length;
 
@@ -146,7 +153,12 @@ function buildRecommendations(
   averageAttributesPerPlayer: number
 ): string[] {
   const recommendations: string[] = [];
-  const lowFields = fields.filter((field) => field.ratio < 0.6 && field.field !== "wage");
+  const lowFields = fields.filter(
+    (field) =>
+      field.ratio < 0.6 &&
+      field.field !== "wage" &&
+      !COACH_CONTEXT_FIELDS.includes(field.field as (typeof COACH_CONTEXT_FIELDS)[number])
+  );
   const missingCore = attributes.filter((attribute) => CORE_ATTRIBUTES.includes(attribute.key) && attribute.ratio < 0.75);
 
   if (lowFields.length > 0) {
@@ -159,6 +171,11 @@ function buildRecommendations(
 
   if (averageAttributesPerPlayer < 16) {
     recommendations.push("스쿼드 export에는 최소 16개 이상 주요 능력치를 포함하는 view를 권장합니다.");
+  }
+
+  const missingContext = fields.filter((field) => COACH_CONTEXT_FIELDS.includes(field.field as (typeof COACH_CONTEXT_FIELDS)[number]) && field.ratio < 0.6);
+  if (missingContext.length > 0) {
+    recommendations.push(`입체적인 역할 분석을 위해 추가하면 좋은 컬럼: ${missingContext.map((field) => field.field).join(", ")}`);
   }
 
   if (recommendations.length === 0) {

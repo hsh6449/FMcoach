@@ -424,7 +424,7 @@ p {
 
 .ability-template-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
 }
 
@@ -971,6 +971,10 @@ p {
   gap: 8px;
 }
 
+.player-profile-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .mini-grid span {
   display: grid;
   gap: 4px;
@@ -985,6 +989,20 @@ p {
 .mini-grid strong {
   color: #1e3128;
   font-size: 16px;
+}
+
+.trait-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e1e7e0;
+  border-radius: 8px;
+  background: #f9fbf8;
+}
+
+.trait-panel > strong {
+  color: #26362e;
+  font-size: 13px;
 }
 
 .fit-list {
@@ -1285,7 +1303,7 @@ p {
   }
 
   .ability-template-row {
-    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     overflow-x: auto;
   }
 
@@ -1349,6 +1367,10 @@ p {
   .summary-grid,
   .side-column,
   .report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .player-profile-grid {
     grid-template-columns: 1fr;
   }
 

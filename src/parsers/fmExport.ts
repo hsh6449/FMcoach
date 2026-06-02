@@ -1,7 +1,8 @@
 import { attributeFromHeader, normalizeHeader } from "../analysis/attributeCatalog";
-import type { AttributeMap, ImportBatch, Player } from "../types/domain";
+import type { AttributeMap, HiddenAttributeKey, HiddenAttributeMap, ImportBatch, Player } from "../types/domain";
 
 type Row = Record<string, string>;
+type PlayerField = keyof Omit<Player, "id" | "attributes" | "hiddenAttributes" | "raw">;
 
 export const SUPPORTED_EXPORT_EXTENSIONS = [".html", ".htm", ".txt", ".csv"] as const;
 
@@ -11,9 +12,13 @@ const FIELD_ALIASES: Record<string, string[]> = {
   age: ["age", "나이"],
   club: ["club", "team", "구단", "팀"],
   nationality: ["nationality", "nat", "nation", "국적"],
+  height: ["height", "hei", "키"],
+  weight: ["weight", "wei", "몸무게", "체중"],
+  preferredFoot: ["preferred foot", "foot", "left foot", "right foot", "주발"],
   value: ["value", "transfer value", "market value", "가치"],
   wage: ["wage", "salary", "주급"],
   personality: ["personality", "성격"],
+  mediaHandling: ["media handling", "media", "미디어 대처", "언론 대처"],
   morale: ["morale", "사기"],
   condition: ["condition", "con", "fitness", "체력", "컨디션"],
   sharpness: ["match sharpness", "sharpness", "sha", "경기 감각"],
@@ -21,14 +26,38 @@ const FIELD_ALIASES: Record<string, string[]> = {
   goals: ["goals", "gls", "골"],
   assists: ["assists", "ast", "도움"],
   minutes: ["minutes", "mins", "min", "출장 시간"],
-  averageRating: ["average rating", "avg rating", "av rat", "rating", "평점"]
+  averageRating: ["average rating", "avg rating", "av rat", "rating", "평점"],
+  preferredMoves: ["preferred moves", "player traits", "traits", "ppms", "ppm", "선호 플레이", "선플"]
 };
 
-const aliasLookup = new Map<string, keyof Omit<Player, "id" | "attributes" | "raw">>();
+const HIDDEN_ATTRIBUTE_ALIASES: Record<HiddenAttributeKey, string[]> = {
+  adaptability: ["adaptability", "ada", "적응력"],
+  ambition: ["ambition", "amb", "야망"],
+  consistency: ["consistency", "cons", "일관성", "꾸준함"],
+  controversy: ["controversy", "contro", "논쟁성"],
+  dirtiness: ["dirtiness", "dirty", "반칙성"],
+  importantMatches: ["important matches", "imp matches", "important match", "imp", "중요 경기"],
+  injuryProneness: ["injury proneness", "injury prone", "inj proneness", "inj", "부상 빈도", "부상 경향"],
+  loyalty: ["loyalty", "loy", "충성심"],
+  pressure: ["pressure", "pres", "압박감 대처"],
+  professionalism: ["professionalism", "prof", "프로의식"],
+  sportsmanship: ["sportsmanship", "sports", "스포츠맨십"],
+  temperament: ["temperament", "temp", "참을성", "기질"],
+  versatility: ["versatility", "vers", "다재다능"]
+};
+
+const aliasLookup = new Map<string, PlayerField>();
+const hiddenAttributeLookup = new Map<string, HiddenAttributeKey>();
 
 for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
   for (const alias of aliases) {
-    aliasLookup.set(normalizeHeader(alias), field as keyof Omit<Player, "id" | "attributes" | "raw">);
+    aliasLookup.set(normalizeHeader(alias), field as PlayerField);
+  }
+}
+
+for (const [field, aliases] of Object.entries(HIDDEN_ATTRIBUTE_ALIASES) as Array<[HiddenAttributeKey, string[]]>) {
+  for (const alias of aliases) {
+    hiddenAttributeLookup.set(normalizeHeader(alias), field);
   }
 }
 
@@ -129,6 +158,7 @@ function matrixToRows(tableRows: string[][]): Row[] {
 function rowToPlayer(row: Row): Player | undefined {
   const normalized: Partial<Player> = {};
   const attributes: AttributeMap = {};
+  const hiddenAttributes: HiddenAttributeMap = {};
 
   for (const [header, value] of Object.entries(row)) {
     const attr = attributeFromHeader(header);
@@ -136,6 +166,15 @@ function rowToPlayer(row: Row): Player | undefined {
       const score = parseNumber(value);
       if (score !== undefined) {
         attributes[attr.key] = clamp(score, 1, 20);
+      }
+      continue;
+    }
+
+    const hiddenAttribute = resolveHiddenAttribute(header);
+    if (hiddenAttribute) {
+      const score = parseNumber(value);
+      if (score !== undefined) {
+        hiddenAttributes[hiddenAttribute] = clamp(score, 1, 20);
       }
       continue;
     }
@@ -150,6 +189,8 @@ function rowToPlayer(row: Row): Player | undefined {
       if (numberValue !== undefined) {
         (normalized as Record<string, number>)[field] = numberValue;
       }
+    } else if (field === "preferredMoves") {
+      normalized.preferredMoves = parseList(value);
     } else {
       (normalized as Record<string, string>)[field] = value;
     }
@@ -166,9 +207,13 @@ function rowToPlayer(row: Row): Player | undefined {
     age: normalized.age,
     club: normalized.club,
     nationality: normalized.nationality,
+    height: normalized.height,
+    weight: normalized.weight,
+    preferredFoot: normalized.preferredFoot,
     value: normalized.value,
     wage: normalized.wage,
     personality: normalized.personality,
+    mediaHandling: normalized.mediaHandling,
     morale: normalized.morale,
     condition: normalized.condition,
     sharpness: normalized.sharpness,
@@ -177,6 +222,8 @@ function rowToPlayer(row: Row): Player | undefined {
     assists: normalized.assists,
     minutes: normalized.minutes,
     averageRating: normalized.averageRating,
+    preferredMoves: normalized.preferredMoves ?? [],
+    hiddenAttributes,
     attributes,
     raw: row
   };
@@ -184,6 +231,17 @@ function rowToPlayer(row: Row): Player | undefined {
 
 function resolveField(header: string) {
   return aliasLookup.get(normalizeHeader(header));
+}
+
+function resolveHiddenAttribute(header: string) {
+  return hiddenAttributeLookup.get(normalizeHeader(header));
+}
+
+function parseList(value: string): string[] {
+  return value
+    .split(/\s*(?:;|\||\/|\u2022|\n)\s*/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function cleanHeader(value: string): string {

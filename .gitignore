@@ -6,3 +6,4 @@ release
 .env
 .env.local
 *.log
+coach-context

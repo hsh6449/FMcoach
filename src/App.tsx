@@ -42,6 +42,7 @@ const BRIDGE_POLL_INTERVAL_MS = 5000;
 
 type BridgeStatus = {
   connected: boolean;
+  contextDir?: string;
   lastScanAt?: string;
   message?: string;
   playerCount?: number;
@@ -60,12 +61,41 @@ type BridgeStatusResponse = Omit<BridgeStatus, "connected" | "message"> & {
 
 type AppView = "overview" | "prepare" | "squad" | "player" | "reports" | "chat";
 
+type CoachContextWriteResult = {
+  ok: true;
+  contextDir: string;
+  requestJsonPath: string;
+  requestMarkdownPath: string;
+  responseJsonPath: string;
+  generatedAt: string;
+};
+
+type CoachContextAnswer = {
+  actions?: string[];
+  confidence?: string;
+  generatedAt?: string;
+  sections?: Array<{ heading: string; items: string[] }>;
+  summary?: string;
+  title?: string;
+  verdict?: string;
+};
+
+type CoachContextReadResult = {
+  ok: boolean;
+  responseJsonPath: string;
+  answer?: CoachContextAnswer;
+  message?: string;
+};
+
 export default function App() {
   const [batch, setBatch] = useState<ImportBatch | undefined>(() => loadBatch());
   const [activeView, setActiveView] = useState<AppView>("overview");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [contextText, setContextText] = useState("");
+  const [coachContextStatus, setCoachContextStatus] = useState("Codex 요청 파일을 만들 수 있습니다.");
+  const [coachContextResult, setCoachContextResult] = useState<CoachContextWriteResult | undefined>();
+  const [coachContextAnswer, setCoachContextAnswer] = useState<CoachContextAnswer | undefined>();
   const [templateCopied, setTemplateCopied] = useState(false);
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>({ connected: false, message: "Bridge not detected" });
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -250,6 +280,50 @@ export default function App() {
     ]);
     setContextText("");
     setActiveView("chat");
+  }
+
+  async function createCoachContextRequest() {
+    const question = contextText.trim() || defaultCoachContextQuestion(selectedPlayer);
+    const request = {
+      mode: "scout" as const,
+      question,
+      selectedPlayerId: selectedId
+    };
+
+    try {
+      const result = window.fmCoach
+        ? await window.fmCoach.createCoachContext(request)
+        : await fetchJson<CoachContextWriteResult>("/api/coach-context/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request)
+        });
+
+      setCoachContextResult(result);
+      setCoachContextAnswer(undefined);
+      setCoachContextStatus("요청 파일을 만들었습니다. Codex가 latest-request.md를 읽고 latest-response.json을 쓰면 됩니다.");
+      setContextText("");
+    } catch {
+      setCoachContextStatus("요청 파일 생성 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
+    }
+  }
+
+  async function loadCoachContextResponse() {
+    try {
+      const result = window.fmCoach
+        ? await window.fmCoach.readCoachResponse()
+        : await fetchJson<CoachContextReadResult>("/api/coach-context/response");
+
+      if (result.ok && result.answer) {
+        setCoachContextAnswer(result.answer);
+        setCoachContextStatus("Codex 응답을 앱에 반영했습니다.");
+        return;
+      }
+
+      setCoachContextStatus(result.message ?? "Codex 응답 파일을 아직 찾지 못했습니다.");
+    } catch {
+      setCoachContextStatus("응답 읽기 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
+    }
   }
 
   function copyTemplateColumns() {
@@ -713,6 +787,53 @@ export default function App() {
                 <MessageSquare size={18} />
                 <h2>코치 대화</h2>
               </div>
+              <div className="codex-handoff">
+                <div className="handoff-copy">
+                  <strong>Codex 연동</strong>
+                  <span>{coachContextStatus}</span>
+                </div>
+                <div className="handoff-actions">
+                  <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void createCoachContextRequest()}>
+                    <FileUp size={16} />
+                    Codex 요청 생성
+                  </button>
+                  <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void loadCoachContextResponse()}>
+                    <RefreshCcw size={16} />
+                    응답 불러오기
+                  </button>
+                </div>
+                {coachContextResult && (
+                  <div className="handoff-result">
+                    <span>요청: {coachContextResult.requestMarkdownPath}</span>
+                    <span>응답: {coachContextResult.responseJsonPath}</span>
+                  </div>
+                )}
+                {coachContextAnswer && (
+                  <div className="codex-answer">
+                    <div className="codex-answer-head">
+                      <strong>{coachContextAnswer.title ?? "Codex 분석"}</strong>
+                      <span>{[coachContextAnswer.verdict, coachContextAnswer.confidence].filter(Boolean).join(" · ")}</span>
+                    </div>
+                    {coachContextAnswer.summary && <p>{coachContextAnswer.summary}</p>}
+                    {coachContextAnswer.sections?.map((section) => (
+                      <div className="codex-answer-section" key={section.heading}>
+                        <strong>{section.heading}</strong>
+                        {section.items.map((item) => (
+                          <span key={item}>{item}</span>
+                        ))}
+                      </div>
+                    ))}
+                    {coachContextAnswer.actions && coachContextAnswer.actions.length > 0 && (
+                      <div className="codex-answer-section">
+                        <strong>다음 행동</strong>
+                        {coachContextAnswer.actions.map((item) => (
+                          <span key={item}>{item}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="chat-log">
                 {messages.map((message) => (
                   <div className={`bubble ${message.role}`} key={message.id}>
@@ -864,6 +985,14 @@ function bridgeStatusLabel(message?: string): string {
   return message;
 }
 
+function defaultCoachContextQuestion(selectedPlayer: Player | undefined): string {
+  if (selectedPlayer) {
+    return `${selectedPlayer.name}을 현재 스쿼드에서 어떤 역할로 쓰는 게 좋은지, 어떤 동료 역할이 보조해야 하는지 분석해 주세요.`;
+  }
+
+  return "현재 스쿼드와 영입 후보 데이터 기준으로 전술/역할 구조와 다음 영입 우선순위를 분석해 주세요.";
+}
+
 function copyTextFallback(text: string) {
   const textarea = document.createElement("textarea");
   textarea.value = text;
@@ -902,8 +1031,8 @@ function filterPlayers(players: Player[], query: string): Player[] {
   );
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }

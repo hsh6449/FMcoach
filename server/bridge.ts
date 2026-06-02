@@ -5,6 +5,7 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ImportBatch } from "../src/types/domain";
+import { readCoachResponse, writeCoachContext, type CoachContextRequest } from "./coachContext";
 import { parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder";
 
 type BridgeState = {
@@ -23,6 +24,8 @@ const port = Number(args.port ?? 8765);
 const host = args.host ?? "127.0.0.1";
 const watchDir = resolve(args.watch ?? join(rootDir, "samples"));
 const distDir = resolve(rootDir, "dist");
+const contextDir = resolve(rootDir, "coach-context");
+const playbookPath = resolve(rootDir, "docs", "AI_COACH_PLAYBOOK.md");
 const emptyBatch: ImportBatch = {
   importedAt: new Date().toISOString(),
   sourceNames: [],
@@ -66,6 +69,7 @@ async function route(request: IncomingMessage, response: ServerResponse) {
       squadPlayerCount: state.squadBatch.players.length,
       targetPlayerCount: state.targetBatch.players.length,
       allPlayerCount: state.batch.players.length,
+      contextDir,
       warnings: [...state.warnings, ...state.squadBatch.warnings]
     });
     return;
@@ -91,6 +95,24 @@ async function route(request: IncomingMessage, response: ServerResponse) {
     return;
   }
 
+  if (url.pathname === "/api/coach-context/request" && request.method === "POST") {
+    const body = await readJsonBody<CoachContextRequest>(request);
+    sendJson(response, await writeCoachContext({
+      allBatch: state.batch,
+      contextDir,
+      playbookPath,
+      request: { ...body, source: body.source ?? "bridge" },
+      squadBatch: state.squadBatch,
+      targetBatch: state.targetBatch
+    }));
+    return;
+  }
+
+  if (url.pathname === "/api/coach-context/response") {
+    sendJson(response, await readCoachResponse(contextDir));
+    return;
+  }
+
   if (url.pathname === "/api/rescan" && request.method === "POST") {
     await scanExports();
     sendJson(response, {
@@ -98,7 +120,8 @@ async function route(request: IncomingMessage, response: ServerResponse) {
       lastScanAt: state.lastScanAt,
       playerCount: state.squadBatch.players.length,
       squadPlayerCount: state.squadBatch.players.length,
-      targetPlayerCount: state.targetBatch.players.length
+      targetPlayerCount: state.targetBatch.players.length,
+      contextDir
     });
     return;
   }
@@ -175,6 +198,20 @@ async function serveStatic(pathname: string, response: ServerResponse) {
 function sendJson(response: ServerResponse, data: unknown) {
   response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(data, null, 2));
+}
+
+async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  if (!raw) {
+    return {} as T;
+  }
+
+  return JSON.parse(raw) as T;
 }
 
 function contentType(filePath: string): string {

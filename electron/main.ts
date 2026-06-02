@@ -3,6 +3,7 @@ import { existsSync, watch, type FSWatcher } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ImportBatch } from "../src/types/domain";
+import { readCoachResponse, writeCoachContext, type CoachContextRequest } from "../server/coachContext";
 import { scanExportFolder, type ExportFileInfo, type SourceBatch } from "../server/exportFolder";
 
 type AppConfig = {
@@ -86,6 +87,15 @@ function registerIpc() {
   ipcMain.handle("fmCoach:getBatch", () => state.squadBatch);
   ipcMain.handle("fmCoach:getTargets", () => state.targetBatch);
   ipcMain.handle("fmCoach:getAllBatch", () => state.batch);
+  ipcMain.handle("fmCoach:createCoachContext", async (_, request: CoachContextRequest) => writeCoachContext({
+    allBatch: state.batch,
+    contextDir: coachContextDir(),
+    playbookPath: join(app.getAppPath(), "docs", "AI_COACH_PLAYBOOK.md"),
+    request: { ...request, source: request.source ?? "desktop" },
+    squadBatch: state.squadBatch,
+    targetBatch: state.targetBatch
+  }));
+  ipcMain.handle("fmCoach:readCoachResponse", () => readCoachResponse(coachContextDir()));
   ipcMain.handle("fmCoach:rescan", async () => {
     await scanExports();
     return statusPayload();
@@ -163,6 +173,7 @@ function statusPayload() {
     squadPlayerCount: state.squadBatch.players.length,
     targetPlayerCount: state.targetBatch.players.length,
     allPlayerCount: state.batch.players.length,
+    contextDir: coachContextDir(),
     warnings: [...state.warnings, ...state.squadBatch.warnings],
     watchDir: state.watchDir
   };
@@ -170,6 +181,10 @@ function statusPayload() {
 
 function defaultExportDir(): string {
   return join(app.getPath("documents"), "Sports Interactive", "Football Manager 2024");
+}
+
+function coachContextDir(): string {
+  return join(app.getPath("documents"), "FM Coach", "coach-context");
 }
 
 async function loadConfig(): Promise<AppConfig> {

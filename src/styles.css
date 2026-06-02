@@ -1196,7 +1196,7 @@ p {
 .chat-panel {
   min-height: 430px;
   display: grid;
-  grid-template-rows: min-content minmax(220px, 1fr) min-content;
+  grid-template-rows: min-content min-content minmax(220px, 1fr) min-content;
 }
 
 .chat-view {
@@ -1210,6 +1210,70 @@ p {
   flex-direction: column;
   gap: 10px;
   padding-right: 2px;
+}
+
+.codex-handoff {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid #dfe7df;
+  border-radius: 8px;
+  background: #f9fbf8;
+}
+
+.handoff-copy,
+.handoff-result,
+.codex-answer-section {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.handoff-copy strong,
+.codex-answer-head strong,
+.codex-answer-section strong {
+  color: #26362e;
+  font-size: 13px;
+}
+
+.handoff-copy span,
+.handoff-result span,
+.codex-answer-head span,
+.codex-answer p,
+.codex-answer-section span {
+  margin: 0;
+  color: #66746b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.handoff-result span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.codex-answer {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #c9e7d8;
+  border-radius: 8px;
+  background: #eef8f2;
+}
+
+.codex-answer-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .bubble {

@@ -107,6 +107,23 @@ FM24 HTML/TXT export
 
 OCR should stay as a context sensor only. It can identify the currently viewed player/team/screen later, while the actual advice should continue to come from exported data.
 
+## Codex Handoff
+
+The app can create a local Codex handoff package:
+
+```text
+normalized squad/targets
+  -> coach-context/latest-request.json
+  -> coach-context/latest-request.md
+  -> Codex reads the request and playbook
+  -> Codex writes coach-context/latest-response.json
+  -> app reads the response and renders it
+```
+
+In the browser bridge workflow, the context folder is `coach-context` at the project root. In the desktop app, it is `~/Documents/FM Coach/coach-context`. The app does not invent AI output; it only renders `latest-response.json` after Codex writes it.
+
+This is intentionally file-based. Codex can run as a separate terminal session, read `latest-request.md`, and write `latest-response.json`. A future embedded terminal/chat panel can wrap that same Codex session without changing the data protocol.
+
 ## Next Steps
 
 - Add a desktop shell with always-on-top overlay behavior.

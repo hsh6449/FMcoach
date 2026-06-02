@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { ImportBatch } from "../src/types/domain";
+import type { CoachContextRequest, CoachContextReadResult, CoachContextWriteResult } from "../server/coachContext";
 
 export type DesktopStatus = {
   ok: boolean;
@@ -10,15 +11,18 @@ export type DesktopStatus = {
   squadPlayerCount?: number;
   targetPlayerCount?: number;
   allPlayerCount?: number;
+  contextDir?: string;
   sources: string[];
   warnings: string[];
 };
 
 contextBridge.exposeInMainWorld("fmCoach", {
   chooseExportFolder: () => ipcRenderer.invoke("fmCoach:chooseExportFolder") as Promise<DesktopStatus>,
+  createCoachContext: (request: CoachContextRequest) => ipcRenderer.invoke("fmCoach:createCoachContext", request) as Promise<CoachContextWriteResult>,
   getBatch: () => ipcRenderer.invoke("fmCoach:getBatch") as Promise<ImportBatch>,
   getTargets: () => ipcRenderer.invoke("fmCoach:getTargets") as Promise<ImportBatch>,
   getAllBatch: () => ipcRenderer.invoke("fmCoach:getAllBatch") as Promise<ImportBatch>,
   getStatus: () => ipcRenderer.invoke("fmCoach:getStatus") as Promise<DesktopStatus>,
+  readCoachResponse: () => ipcRenderer.invoke("fmCoach:readCoachResponse") as Promise<CoachContextReadResult>,
   rescan: () => ipcRenderer.invoke("fmCoach:rescan") as Promise<DesktopStatus>
 });

@@ -4,6 +4,7 @@
 
 - Parse FM24 squad/player-search exports.
 - Watch an export folder through the local bridge server.
+- Offer terminal-only coaching for fast use beside FM.
 - Normalize key attributes and basic profile fields.
 - Score common role fits.
 - Recommend training focus and transfer priorities.
@@ -21,6 +22,7 @@
 - Build a desktop shell with an always-on-top frameless assistant panel.
 - Add theme variables matching a custom FM24 skin.
 - Keep the FM skin simple: reserve visual space and let the overlay provide interaction.
+- Keep the terminal coach as a fallback when overlays are distracting or unreliable.
 
 ## Phase 4: Context Sensor
 

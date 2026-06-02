@@ -35,6 +35,21 @@ npm run bridge -- --watch "/path/to/your/FM24/export/folder"
 
 Then open `http://127.0.0.1:8765`. The app will read any `.html`, `.htm`, `.txt`, or `.csv` files in that folder and expose them through the local bridge API.
 
+For terminal-only coaching:
+
+```bash
+npm run coach -- --watch "/path/to/your/FM24/export/folder"
+```
+
+Useful terminal commands:
+
+- `/sync`: rescan the export folder
+- `/summary`: show squad summary
+- `/players [search]`: list players
+- `/player name`: set the current player context
+- `/files`: list imported export files
+- `/quit`: exit
+
 ## FM24 Data Flow
 
 1. In FM24, create a custom squad/player search view with the columns you want.
@@ -42,6 +57,8 @@ Then open `http://127.0.0.1:8765`. The app will read any `.html`, `.htm`, `.txt`
 3. Point the FM Coach bridge at the folder where those files are saved.
 4. Export again whenever the save changes; the bridge rescans the folder.
 5. Ask the coach about a player, training focus, tactical fit, or transfer needs.
+
+You can use either the browser dashboard or the terminal coach. Both read the same export-folder data.
 
 ## Architecture
 
@@ -60,6 +77,7 @@ OCR should stay as a context sensor only. It can identify the currently viewed p
 ## Next Steps
 
 - Add a desktop shell with always-on-top overlay behavior.
+- Add compact terminal workflows for quick in-game consultation.
 - Add a folder watcher for FM export refreshes.
 - Add FM skin notes for reserving an assistant panel area.
 - Add match/stat export adapters.

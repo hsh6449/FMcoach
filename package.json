@@ -42,8 +42,15 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "docs/**/*",
       "samples/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "docs",
+        "to": "docs"
+      }
     ],
     "mac": {
       "target": "dir",

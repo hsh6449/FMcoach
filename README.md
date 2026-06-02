@@ -120,9 +120,18 @@ normalized squad/targets
   -> app reads the response and renders it
 ```
 
-In the browser bridge workflow, the context folder is `coach-context` at the project root. In the desktop app, it is `~/Documents/FM Coach/coach-context`. The app does not invent AI output; it only renders `latest-response.json` after Codex writes it.
+In the browser bridge workflow, the context folder is `coach-context` at the project root. In the desktop app, it is `~/Documents/FM Coach/coach-context`. The app creates this folder on startup, so a new laptop setup does not need manual folder creation. Each request also copies `AI_COACH_PLAYBOOK.md` into that folder so Codex can read a normal local file. The app does not invent AI output; it only renders `latest-response.json` after Codex writes it.
 
-This is intentionally file-based. Codex can run as a separate terminal session, read `latest-request.md`, and write `latest-response.json`. A future embedded terminal/chat panel can wrap that same Codex session without changing the data protocol.
+This is intentionally file-based. The chat panel can run a real Codex CLI handoff:
+
+```text
+app creates latest-request.md/json
+  -> backend runs codex exec
+  -> Codex writes latest-response.json
+  -> app reads latest-response.json
+```
+
+If Codex is installed in a non-standard location, set `FM_COACH_CODEX_BIN=/path/to/codex`. This is the first terminal-connection experiment. A fuller embedded terminal/chat panel can wrap the same file protocol without changing the data contract.
 
 ## Next Steps
 

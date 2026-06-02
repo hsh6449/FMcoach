@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  Terminal,
   Trash2,
   Upload,
   UserCheck,
@@ -87,9 +88,28 @@ type CoachContextReadResult = {
   message?: string;
 };
 
+type CodexRunResult = {
+  ok: boolean;
+  command: string;
+  contextDir: string;
+  cwd: string;
+  durationMs: number;
+  exitCode?: number | null;
+  finishedAt: string;
+  message?: string;
+  requestJsonPath: string;
+  requestMarkdownPath: string;
+  response?: CoachContextReadResult;
+  responseJsonPath: string;
+  signal?: string | null;
+  startedAt: string;
+  stderr: string;
+  stdout: string;
+};
+
 type SessionLine = {
   id: string;
-  kind: "app" | "codex" | "file" | "system";
+  kind: "app" | "codex" | "file" | "system" | "terminal";
   text: string;
 };
 
@@ -102,6 +122,7 @@ export default function App() {
   const [coachContextStatus, setCoachContextStatus] = useState("Codex 요청 파일을 만들 수 있습니다.");
   const [coachContextResult, setCoachContextResult] = useState<CoachContextWriteResult | undefined>();
   const [coachContextAnswer, setCoachContextAnswer] = useState<CoachContextAnswer | undefined>();
+  const [isCodexRunning, setIsCodexRunning] = useState(false);
   const [sessionLines, setSessionLines] = useState<SessionLine[]>([
     { id: "session-ready", kind: "system", text: "Codex 세션 대기 중. 앱은 요청 파일을 만들고 응답 파일을 읽습니다." }
   ]);
@@ -310,7 +331,7 @@ export default function App() {
 
       setCoachContextResult(result);
       setCoachContextAnswer(undefined);
-      setCoachContextStatus("요청 파일을 만들었습니다. Codex가 latest-request.md를 읽고 latest-response.json을 쓰면 됩니다.");
+      setCoachContextStatus("요청 파일을 만들었습니다. 이제 실제 Codex CLI를 실행할 수 있습니다.");
       appendSessionLines([
         { kind: "app", text: `request 생성: ${shortPath(result.requestMarkdownPath)}` },
         { kind: "file", text: `Codex 입력 JSON: ${shortPath(result.requestJsonPath)}` },
@@ -323,28 +344,40 @@ export default function App() {
     }
   }
 
-  async function writeDummyResponse() {
+  async function runCodexSession() {
+    if (isCodexRunning) {
+      return;
+    }
+
+    setIsCodexRunning(true);
+    setCoachContextStatus("Codex CLI 실행 중입니다. latest-response.json 작성 여부를 확인하고 있습니다.");
+    appendSessionLines([{ kind: "terminal", text: "codex exec 시작" }]);
+
     try {
       const result = window.fmCoach
-        ? await window.fmCoach.writeDummyCoachResponse()
-        : await fetchJson<CoachContextReadResult>("/api/coach-context/dummy-response", { method: "POST" });
+        ? await window.fmCoach.runCodexHandoff()
+        : await fetchJson<CodexRunResult>("/api/coach-context/run-codex", { method: "POST" });
+      const answer = result.response?.answer as CoachContextAnswer | undefined;
+      const outputLine = compactOutput(result.stdout || result.stderr);
 
-      const answer = result.answer as CoachContextAnswer | undefined;
+      appendSessionLines([
+        { kind: "terminal", text: result.command ? `실행: ${shortCommand(result.command)}` : "실행할 요청 파일이 없습니다." },
+        { kind: result.ok ? "file" : "system", text: result.message ?? `exit=${result.exitCode ?? "unknown"}` },
+        ...(outputLine ? [{ kind: "codex" as const, text: outputLine }] : [])
+      ]);
+
       if (result.ok && answer) {
         setCoachContextAnswer(answer);
-        setCoachContextStatus("더미 Codex 응답을 생성하고 앱에 반영했습니다.");
-        appendSessionLines([
-          { kind: "codex", text: "dummy response 작성 완료" },
-          { kind: "file", text: `응답 파일: ${shortPath(result.responseJsonPath)}` }
-        ]);
+        setCoachContextStatus("Codex CLI가 latest-response.json을 쓰고 앱에 반영했습니다.");
         return;
       }
 
-      setCoachContextStatus(result.message ?? "더미 응답 생성에 실패했습니다.");
-      appendSessionLines([{ kind: "system", text: result.message ?? "더미 응답 생성 실패" }]);
+      setCoachContextStatus(result.message ?? "Codex CLI 실행 결과를 확인해 주세요.");
     } catch {
-      setCoachContextStatus("더미 응답 생성 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
-      appendSessionLines([{ kind: "system", text: "더미 응답 생성 실패. Desktop 앱 또는 Bridge 서버 연결을 확인하세요." }]);
+      setCoachContextStatus("Codex CLI 실행 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
+      appendSessionLines([{ kind: "system", text: "Codex CLI 실행 실패. Desktop 앱 또는 Bridge 서버 연결을 확인하세요." }]);
+    } finally {
+      setIsCodexRunning(false);
     }
   }
 
@@ -851,9 +884,9 @@ export default function App() {
                     <FileUp size={16} />
                     Codex 요청 생성
                   </button>
-                  <button className="secondary-button" disabled={!bridgeStatus.connected || !coachContextResult} onClick={() => void writeDummyResponse()}>
-                    <Sparkles size={16} />
-                    더미 응답
+                  <button className="secondary-button" disabled={!bridgeStatus.connected || isCodexRunning} onClick={() => void runCodexSession()}>
+                    <Terminal size={16} />
+                    {isCodexRunning ? "실행 중" : "Codex 실행"}
                   </button>
                   <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void loadCoachContextResponse()}>
                     <RefreshCcw size={16} />
@@ -863,7 +896,7 @@ export default function App() {
                 <div className="session-console" aria-label="Codex 세션 콘솔">
                   <div className="console-top">
                     <strong>codex session</strong>
-                    <span>{bridgeStatus.connected ? "file handoff ready" : "waiting for bridge"}</span>
+                    <span>{isCodexRunning ? "running codex exec" : bridgeStatus.connected ? "file handoff ready" : "waiting for bridge"}</span>
                   </div>
                   <div className="console-lines">
                     {sessionLines.map((line) => (
@@ -1069,6 +1102,7 @@ function consolePrompt(kind: SessionLine["kind"]): string {
   if (kind === "codex") return "codex";
   if (kind === "file") return "file";
   if (kind === "app") return "app";
+  if (kind === "terminal") return "term";
   return "sys";
 }
 
@@ -1076,6 +1110,23 @@ function shortPath(path: string): string {
   const marker = "coach-context/";
   const index = path.lastIndexOf(marker);
   return index >= 0 ? path.slice(index) : path;
+}
+
+function compactOutput(text: string, maxLength = 520): string {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLength) {
+    return compact;
+  }
+
+  return `${compact.slice(0, maxLength - 1)}...`;
+}
+
+function shortCommand(command: string, maxLength = 160): string {
+  if (command.length <= maxLength) {
+    return command;
+  }
+
+  return `${command.slice(0, maxLength - 1)}...`;
 }
 
 function copyTextFallback(text: string) {

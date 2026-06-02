@@ -3,7 +3,8 @@ import { existsSync, watch, type FSWatcher } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ImportBatch } from "../src/types/domain";
-import { readCoachResponse, writeCoachContext, writeDummyCoachResponse, type CoachContextRequest } from "../server/coachContext";
+import { ensureCoachContextDir, readCoachResponse, writeCoachContext, type CoachContextRequest } from "../server/coachContext";
+import { runCodexHandoff } from "../server/codexRunner";
 import { scanExportFolder, type ExportFileInfo, type SourceBatch } from "../server/exportFolder";
 
 type AppConfig = {
@@ -45,6 +46,7 @@ app.whenReady().then(async () => {
     watchDir: config.watchDir ?? defaultExportDir()
   };
 
+  await ensureCoachContextDir(coachContextDir());
   await scanExports();
   startWatcher();
   registerIpc();
@@ -90,13 +92,18 @@ function registerIpc() {
   ipcMain.handle("fmCoach:createCoachContext", async (_, request: CoachContextRequest) => writeCoachContext({
     allBatch: state.batch,
     contextDir: coachContextDir(),
-    playbookPath: join(app.getAppPath(), "docs", "AI_COACH_PLAYBOOK.md"),
+    playbookPath: coachPlaybookPath(),
     request: { ...request, source: request.source ?? "desktop" },
     squadBatch: state.squadBatch,
     targetBatch: state.targetBatch
   }));
+  ipcMain.handle("fmCoach:getCoachContextSetup", () => ensureCoachContextDir(coachContextDir()));
   ipcMain.handle("fmCoach:readCoachResponse", () => readCoachResponse(coachContextDir()));
-  ipcMain.handle("fmCoach:writeDummyCoachResponse", () => writeDummyCoachResponse(coachContextDir()));
+  ipcMain.handle("fmCoach:runCodexHandoff", () => runCodexHandoff({
+    contextDir: coachContextDir(),
+    playbookPath: coachPlaybookPath(),
+    workspaceDir: app.getAppPath()
+  }));
   ipcMain.handle("fmCoach:rescan", async () => {
     await scanExports();
     return statusPayload();
@@ -186,6 +193,11 @@ function defaultExportDir(): string {
 
 function coachContextDir(): string {
   return join(app.getPath("documents"), "FM Coach", "coach-context");
+}
+
+function coachPlaybookPath(): string {
+  const resourcesPath = join(process.resourcesPath, "docs", "AI_COACH_PLAYBOOK.md");
+  return existsSync(resourcesPath) ? resourcesPath : join(app.getAppPath(), "docs", "AI_COACH_PLAYBOOK.md");
 }
 
 async function loadConfig(): Promise<AppConfig> {

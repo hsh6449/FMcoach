@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { ImportBatch } from "../src/types/domain";
-import type { CoachContextRequest, CoachContextReadResult, CoachContextWriteResult } from "../server/coachContext";
+import type { CoachContextRequest, CoachContextReadResult, CoachContextSetupResult, CoachContextWriteResult } from "../server/coachContext";
+import type { CodexRunResult } from "../server/codexRunner";
 
 export type DesktopStatus = {
   ok: boolean;
@@ -22,8 +23,9 @@ contextBridge.exposeInMainWorld("fmCoach", {
   getBatch: () => ipcRenderer.invoke("fmCoach:getBatch") as Promise<ImportBatch>,
   getTargets: () => ipcRenderer.invoke("fmCoach:getTargets") as Promise<ImportBatch>,
   getAllBatch: () => ipcRenderer.invoke("fmCoach:getAllBatch") as Promise<ImportBatch>,
+  getCoachContextSetup: () => ipcRenderer.invoke("fmCoach:getCoachContextSetup") as Promise<CoachContextSetupResult>,
   getStatus: () => ipcRenderer.invoke("fmCoach:getStatus") as Promise<DesktopStatus>,
   readCoachResponse: () => ipcRenderer.invoke("fmCoach:readCoachResponse") as Promise<CoachContextReadResult>,
   rescan: () => ipcRenderer.invoke("fmCoach:rescan") as Promise<DesktopStatus>,
-  writeDummyCoachResponse: () => ipcRenderer.invoke("fmCoach:writeDummyCoachResponse") as Promise<CoachContextReadResult>
+  runCodexHandoff: () => ipcRenderer.invoke("fmCoach:runCodexHandoff") as Promise<CodexRunResult>
 });

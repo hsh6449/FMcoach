@@ -5,7 +5,8 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ImportBatch } from "../src/types/domain";
-import { readCoachResponse, writeCoachContext, writeDummyCoachResponse, type CoachContextRequest } from "./coachContext";
+import { ensureCoachContextDir, readCoachResponse, writeCoachContext, type CoachContextRequest } from "./coachContext";
+import { runCodexHandoff } from "./codexRunner";
 import { parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder";
 
 type BridgeState = {
@@ -44,6 +45,7 @@ let state: BridgeState = {
 let scanTimer: NodeJS.Timeout | undefined;
 
 await scanExports();
+await ensureCoachContextDir(contextDir);
 startWatcher();
 
 const server = createServer((request, response) => {
@@ -108,13 +110,22 @@ async function route(request: IncomingMessage, response: ServerResponse) {
     return;
   }
 
+  if (url.pathname === "/api/coach-context/setup") {
+    sendJson(response, await ensureCoachContextDir(contextDir));
+    return;
+  }
+
   if (url.pathname === "/api/coach-context/response") {
     sendJson(response, await readCoachResponse(contextDir));
     return;
   }
 
-  if (url.pathname === "/api/coach-context/dummy-response" && request.method === "POST") {
-    sendJson(response, await writeDummyCoachResponse(contextDir));
+  if (url.pathname === "/api/coach-context/run-codex" && request.method === "POST") {
+    sendJson(response, await runCodexHandoff({
+      contextDir,
+      playbookPath,
+      workspaceDir: rootDir
+    }));
     return;
   }
 

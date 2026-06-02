@@ -1319,6 +1319,10 @@ p {
   color: #ffd27a;
 }
 
+.console-line.terminal span {
+  color: #f4a6ff;
+}
+
 .console-line.system span {
   color: #9aa99f;
 }

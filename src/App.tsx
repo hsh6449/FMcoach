@@ -327,6 +327,40 @@ export default function App() {
             <span>{bridgeStatus.targetPlayerCount ?? 0}명 영입 후보</span>
             {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
           </div>
+
+          <div className="prep-guide">
+            <div className="prep-head">
+              <div className="panel-title compact">
+                <ClipboardList size={18} />
+                <h2>FM View 준비</h2>
+              </div>
+              <button className="mini-action-button" onClick={copyTemplateColumns}>
+                {templateCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
+                {templateCopied ? "복사됨" : "능력치 복사"}
+              </button>
+            </div>
+            <div className="prep-steps">
+              <span><strong>1</strong> 선수단 View</span>
+              <span><strong>2</strong> 능력치 포함</span>
+              <span><strong>3</strong> HTML/TXT/CSV export</span>
+            </div>
+            <div className="ability-template-row">
+              {exportTemplateGroups.map((group) => (
+                <div className="ability-template-card" key={group.id}>
+                  <div className="template-group-head">
+                    <strong>{group.label}</strong>
+                    <span>{group.columns.length}개</span>
+                  </div>
+                  <div className="template-chip-list">
+                    {group.columns.slice(0, 5).map((column) => (
+                      <span key={column}>{column}</span>
+                    ))}
+                    {group.columns.length > 5 && <span>+{group.columns.length - 5}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="summary-grid">
@@ -531,12 +565,12 @@ export default function App() {
               )}
               <div className="quick-actions-head">
                 <strong>빠른 질문</strong>
-                <span>선택 선수나 현재 선수단 기준으로 코치 대화에 바로 질문합니다.</span>
+                <span>{selectedPlayer ? `${selectedPlayer.name} 기준 질문` : "선수를 선택하면 개인 질문이 활성화됩니다."}</span>
               </div>
               <div className="quick-actions">
-                <button title="선택 선수의 훈련 포커스를 묻습니다" disabled={!hasPlayers} onClick={() => askAssistant("이 선수 훈련 뭐가 좋아?")}>훈련 질문</button>
-                <button title="선택 선수의 역할 적합도를 묻습니다" disabled={!hasPlayers} onClick={() => askAssistant("이 선수 역할은?")}>역할 질문</button>
-                <button title="현재 선수단의 보강 우선순위를 묻습니다" disabled={!hasPlayers} onClick={() => askAssistant("보강 우선순위는?")}>영입 질문</button>
+                <button title="선택 선수의 훈련 포커스를 묻습니다" disabled={!selectedPlayer} onClick={() => askAssistant("이 선수 훈련 뭐가 좋아?")}>훈련 조언</button>
+                <button title="선택 선수의 역할 적합도를 묻습니다" disabled={!selectedPlayer} onClick={() => askAssistant("이 선수 역할은?")}>역할 분석</button>
+                <button title="현재 선수단의 보강 우선순위를 묻습니다" disabled={!hasPlayers} onClick={() => askAssistant("보강 우선순위는?")}>보강 우선</button>
               </div>
             </section>
 
@@ -567,39 +601,6 @@ export default function App() {
                 ))}
                 {bridgeStatus.warnings?.map((warning) => (
                   <p key={warning}>{warning}</p>
-                ))}
-              </div>
-            </section>
-
-            <section className="panel template-panel">
-              <div className="section-head simple">
-                <div className="panel-title compact">
-                  <ClipboardList size={18} />
-                  <h2>능력치 템플릿</h2>
-                </div>
-                <button className="mini-action-button" onClick={copyTemplateColumns}>
-                  {templateCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
-                  {templateCopied ? "복사됨" : "컬럼 복사"}
-                </button>
-              </div>
-              <p className="template-note">
-                FM 선수 프로필에 있는 능력치 템플릿 기준입니다. 기술적/정신적/신체적 능력치를 그대로 확인하거나 복사할 수 있습니다.
-              </p>
-              <div className="template-groups">
-                {exportTemplateGroups.map((group) => (
-                  <div className="template-group" key={group.id}>
-                    <div className="template-group-head">
-                      <strong>{group.label}</strong>
-                      <span>{group.columns.length}개</span>
-                    </div>
-                    <p>{group.description}</p>
-                    <div className="template-chip-list">
-                      {group.columns.slice(0, 8).map((column) => (
-                        <span key={column}>{column}</span>
-                      ))}
-                      {group.columns.length > 8 && <span>+{group.columns.length - 8}</span>}
-                    </div>
-                  </div>
                 ))}
               </div>
             </section>

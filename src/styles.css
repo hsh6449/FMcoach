@@ -272,6 +272,69 @@ p {
   white-space: nowrap;
 }
 
+.prep-guide {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(240px, 1fr) minmax(320px, 1.4fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #dce5dc;
+  border-radius: 8px;
+  background: #f9fbf8;
+}
+
+.prep-head {
+  display: grid;
+  gap: 8px;
+}
+
+.prep-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.prep-steps span {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid #e1e7e0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #33443b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.prep-steps strong {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #176a4b;
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.ability-template-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ability-template-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e1e7e0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -943,27 +1006,6 @@ p {
   line-height: 1.45;
 }
 
-.template-note {
-  margin: 0 0 12px;
-  color: #66746b;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.template-groups {
-  display: grid;
-  gap: 10px;
-}
-
-.template-group {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid #e1e7e0;
-  border-radius: 8px;
-  background: #f9fbf8;
-}
-
 .template-group-head {
   display: flex;
   align-items: center;
@@ -980,13 +1022,6 @@ p {
   color: #176a4b;
   font-size: 12px;
   font-weight: 800;
-}
-
-.template-group p {
-  margin: 0;
-  color: #68766d;
-  font-size: 12px;
-  line-height: 1.4;
 }
 
 .template-chip-list {
@@ -1102,6 +1137,15 @@ p {
     grid-template-columns: 1fr;
   }
 
+  .prep-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .ability-template-row {
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    overflow-x: auto;
+  }
+
   .depth-board {
     grid-template-columns: repeat(8, minmax(84px, 1fr));
     overflow-x: auto;
@@ -1131,6 +1175,10 @@ p {
   .toolbar {
     justify-content: flex-start;
     min-width: 0;
+  }
+
+  .ability-template-row {
+    grid-template-columns: 1fr;
   }
 
   .summary-grid,

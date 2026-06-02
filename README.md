@@ -69,6 +69,14 @@ Useful terminal commands:
 
 The terminal coach classifies files by name. Use names like `squad.html` for your own squad and `targets-shortlist.html`, `scout-search.html`, or `transfer-candidates.csv` for recruitment exports.
 
+For experimental FMF inspection:
+
+```bash
+npm run fmf:inspect -- "/path/to/file-or-folder.fmf"
+```
+
+See `docs/FMF_LAB.md` for the FMF investigation plan.
+
 ## FM24 Data Flow
 
 1. In FM24, create a custom squad/player search view with the columns you want.
@@ -104,3 +112,4 @@ OCR should stay as a context sensor only. It can identify the currently viewed p
 - Add match/stat export adapters.
 - Add LLM-backed responses with cited local data snippets.
 - Add OCR context detection for current player/team names.
+- Add experimental FMF readers for tactic/view/shortlist files.

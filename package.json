@@ -12,6 +12,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "bridge": "tsx server/bridge.ts",
     "coach": "tsx server/coachCli.ts",
+    "fmf:inspect": "tsx server/fmfInspector.ts",
     "start": "npm run build && npm run bridge",
     "desktop": "npm run build && electron dist-electron/main.cjs",
     "package:mac": "npm run build && electron-builder --mac dir"

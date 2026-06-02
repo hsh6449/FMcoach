@@ -36,3 +36,12 @@
 - Add a retrieval layer over the local normalized database.
 - Send only relevant player/stat snippets to the model.
 - Require every recommendation to cite the local fields it used.
+
+## Phase 6: FMF Lab
+
+- Inspect actual FM24 `.fmf` files with `npm run fmf:inspect`.
+- Prefer Resource Archiver extracted folders before writing a binary decoder.
+- Parse tactic FMF contents into tactic profiles.
+- Parse view FMF contents into expected export schemas.
+- Attempt shortlist FMF candidate extraction.
+- Keep direct FMF archive decoding isolated from the main app.

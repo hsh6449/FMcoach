@@ -17,6 +17,115 @@ The current MVP reads FM24 HTML/TXT/CSV-style table exports, normalizes player d
 - Chat panel backed by the local analysis engine
 - Context selector that can later be driven by OCR
 
+## Local Environment Setup
+
+Use this checklist when cloning the project on another laptop.
+
+### Requirements
+
+- Node.js 20 or newer
+- npm
+- macOS for the current Electron packaging script
+- Football Manager 2024 exports in `.html`, `.htm`, `.txt`, or `.csv`
+- Codex CLI, only if you want the real Codex handoff button to run
+
+Check the basics:
+
+```bash
+node --version
+npm --version
+which codex
+codex --version
+```
+
+The project targets Node 20 for the Electron build. If `node --version` is older than 20, install or switch Node before running `npm install`.
+
+### First Run On A New Machine
+
+```bash
+git clone https://github.com/hsh6449/FMcoach.git
+cd FMcoach
+npm install
+npm run build
+```
+
+For browser development:
+
+```bash
+npm run bridge -- --watch "/path/to/FM/export/folder" --port 8765
+npm run dev -- --port 5174
+```
+
+Then open `http://127.0.0.1:5174/`.
+
+For the desktop app:
+
+```bash
+npm run desktop
+```
+
+The desktop app stores its Codex handoff files in:
+
+```text
+~/Documents/FM Coach/coach-context
+```
+
+The browser bridge stores them in:
+
+```text
+./coach-context
+```
+
+Both folders are created automatically when the app or bridge starts.
+
+### Codex CLI Path
+
+The app tries to run Codex from:
+
+```text
+/Applications/Codex.app/Contents/Resources/codex
+```
+
+If Codex is installed somewhere else, set:
+
+```bash
+export FM_COACH_CODEX_BIN="/path/to/codex"
+```
+
+Then start the bridge or desktop app from the same terminal session. Without Codex CLI, import, parsing, squad analysis, and local chat still work; only the real Codex handoff run fails.
+
+### FM Export Folder
+
+The bridge and desktop app classify files by name:
+
+- `squad.html`, `team.html`, `roster.csv`: own squad
+- `targets-shortlist.html`, `scout-search.html`, `transfer-candidates.csv`: recruitment candidates
+- `stats.html`, `match-record.csv`: stats or records
+
+Keep squad exports and recruitment/search exports in the watched folder, but name them clearly so candidate files do not pollute the squad report.
+
+### Generated Local Files
+
+These folders are local-only and ignored by git:
+
+```text
+node_modules/
+dist/
+dist-electron/
+release/
+coach-context/
+```
+
+Do not copy `coach-context` between machines unless you intentionally want to bring old Codex run history with you.
+
+### Common Fixes
+
+- Port already in use: change the port, for example `npm run dev -- --port 5175` or `npm run bridge -- --port 8766`.
+- Bridge not detected: make sure the bridge is running on `127.0.0.1:8765`, or use the desktop app instead.
+- No players imported: check the export folder path and make sure the file extension is supported.
+- Codex run fails: check `which codex`, `codex --version`, and `FM_COACH_CODEX_BIN`.
+- Old data appears: use the `Data Sync` row in the app and click `Apply`; Codex request creation is disabled while export data and displayed data differ.
+
 ## Run
 
 ```bash

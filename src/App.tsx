@@ -57,8 +57,11 @@ type BridgeStatusResponse = Omit<BridgeStatus, "connected" | "message"> & {
   ok: boolean;
 };
 
+type AppView = "overview" | "prepare" | "squad" | "player" | "reports" | "chat";
+
 export default function App() {
   const [batch, setBatch] = useState<ImportBatch | undefined>(() => loadBatch());
+  const [activeView, setActiveView] = useState<AppView>("overview");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [contextText, setContextText] = useState("");
@@ -87,6 +90,14 @@ export default function App() {
   const visibleTacticalNotes = hasPlayers ? report.tacticalNotes : [];
   const mainNeed = visibleTransferPriorities[0] ?? visibleNeeds[0];
   const lastSource = batch?.sourceNames.at(-1);
+  const coachMenu: Array<{ id: AppView; label: string; helper: string; icon: ReactNode }> = [
+    { id: "overview", label: "개요", helper: "오늘의 판단", icon: <Sparkles size={18} /> },
+    { id: "prepare", label: "데이터 준비", helper: "Export / View", icon: <FolderOpen size={18} /> },
+    { id: "squad", label: "선수단", helper: "검색 / 비교", icon: <BarChart3 size={18} /> },
+    { id: "player", label: "선수", helper: selectedPlayer?.name ?? "개인 분석", icon: <Activity size={18} /> },
+    { id: "reports", label: "리포트", helper: "역할 / 영입", icon: <ClipboardList size={18} /> },
+    { id: "chat", label: "코치 대화", helper: "질문하기", icon: <MessageSquare size={18} /> }
+  ];
 
   useEffect(() => {
     if (batch) {
@@ -107,6 +118,7 @@ export default function App() {
     const nextBatch = await parseFiles([...files]);
     setBatch(nextBatch);
     setSelectedId(nextBatch.players[0]?.id);
+    setActiveView("overview");
     setMessages((items) => [
       ...items,
       {
@@ -161,6 +173,7 @@ export default function App() {
       const nextBatch = await window.fmCoach.getBatch();
       setBatch(nextBatch);
       setSelectedId((current) => current ?? nextBatch.players[0]?.id);
+      setActiveView("overview");
 
       if (announce) {
         setMessages((items) => [
@@ -182,6 +195,7 @@ export default function App() {
     const nextBatch = await fetchJson<ImportBatch>("/api/batch");
     setBatch(nextBatch);
     setSelectedId((current) => current ?? nextBatch.players[0]?.id);
+    setActiveView("overview");
     await checkBridge(false);
 
     if (announce) {
@@ -211,6 +225,7 @@ export default function App() {
     setBatch(undefined);
     setSelectedId(undefined);
     setContextText("");
+    setActiveView("prepare");
     setMessages([
       {
         id: crypto.randomUUID(),
@@ -234,6 +249,7 @@ export default function App() {
       { id: crypto.randomUUID(), role: "assistant", content: answer }
     ]);
     setContextText("");
+    setActiveView("chat");
   }
 
   function copyTemplateColumns() {
@@ -276,102 +292,128 @@ export default function App() {
       </header>
 
       <main className="coach-desk">
-        <section className="command-center">
-          <div className="command-copy">
-            <div className="panel-title compact">
-              <FolderOpen size={18} />
-              <h2>데이터 가져오기</h2>
-            </div>
-            <strong>{hasPlayers ? `${players.length}명의 선수단 데이터가 준비됐습니다` : "FM24 export를 기다리고 있습니다"}</strong>
-            <span>
-              {hasPlayers
-                ? lastSource ?? "로컬에 저장된 선수단 데이터를 사용 중입니다"
-                : "HTML, TXT, CSV export 또는 지정한 export 폴더를 사용할 수 있습니다"}
-            </span>
-          </div>
-          <div className="command-actions">
-            <button className="primary-button" onClick={() => fileInputRef.current?.click()}>
-              <FileUp size={18} />
-              파일 선택
-            </button>
-            <input
-              ref={fileInputRef}
-              className="hidden-input"
-              type="file"
-              multiple
-              accept=".html,.htm,.txt,.csv"
-              onChange={(event) => {
-                if (event.currentTarget.files) {
-                  void handleFiles(event.currentTarget.files);
-                  event.currentTarget.value = "";
-                }
-              }}
-            />
-            {window.fmCoach && (
-              <button className="secondary-button" onClick={() => void chooseExportFolder()}>
-                <FolderOpen size={18} />
-                폴더 선택
+        <div className="coach-shell">
+          <aside className="app-menu" aria-label="주 메뉴">
+            <span className="menu-kicker">메뉴</span>
+            {coachMenu.map((item) => (
+              <button
+                className={`menu-button ${activeView === item.id ? "active" : ""}`}
+                key={item.id}
+                onClick={() => setActiveView(item.id)}
+              >
+                <span className="menu-icon">{item.icon}</span>
+                <span className="menu-copy">
+                  <strong>{item.label}</strong>
+                  <small>{item.helper}</small>
+                </span>
               </button>
-            )}
-            <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void loadBridgeData()}>
-              <FolderSync size={18} />
-              동기화
-            </button>
-          </div>
-          <div className={`bridge-strip ${bridgeStatus.connected ? "connected" : "offline"}`}>
-            <span>
-              <FolderSync size={16} />
-              {bridgeStatus.connected ? `${bridgeStatus.sourceCount ?? 0}개 파일` : bridgeStatusLabel(bridgeStatus.message)}
-            </span>
-            <span>{bridgeStatus.squadPlayerCount ?? bridgeStatus.playerCount ?? players.length}명 선수단</span>
-            <span>{bridgeStatus.targetPlayerCount ?? 0}명 영입 후보</span>
-            {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
-          </div>
+            ))}
+          </aside>
 
-          <div className="prep-guide">
-            <div className="prep-head">
-              <div className="panel-title compact">
-                <ClipboardList size={18} />
-                <h2>FM View 준비</h2>
-              </div>
-              <button className="mini-action-button" onClick={copyTemplateColumns}>
-                {templateCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
-                {templateCopied ? "복사됨" : "능력치 복사"}
-              </button>
-            </div>
-            <div className="prep-steps">
-              <span><strong>1</strong> 선수단 View</span>
-              <span><strong>2</strong> 능력치 포함</span>
-              <span><strong>3</strong> HTML/TXT/CSV export</span>
-            </div>
-            <div className="ability-template-row">
-              {exportTemplateGroups.map((group) => (
-                <div className="ability-template-card" key={group.id}>
-                  <div className="template-group-head">
-                    <strong>{group.label}</strong>
-                    <span>{group.columns.length}개</span>
+          <section className="content-area">
+            <section className="summary-grid quick-info-grid" aria-label="빠른 정보">
+              <Metric
+                icon={<Users size={18} />}
+                label="선수단"
+                value={players.length}
+                helper={hasPlayers ? `${report.bestXi.length}명 Best XI 후보` : "데이터 대기"}
+              />
+              <Metric icon={<Gauge size={18} />} label="품질" value={quality.score} helper={qualityStatusLabel(quality.status)} />
+              <Metric icon={<ShieldCheck size={18} />} label="준비도" value={briefing.readiness} helper={briefing.headline} />
+              <Metric icon={<Target size={18} />} label="보강" value={visibleNeeds.length} helper={mainNeed?.area ?? "대기 중"} />
+            </section>
+
+            {activeView === "prepare" && (
+              <section className="command-center">
+                <div className="command-copy">
+                  <div className="panel-title compact">
+                    <FolderOpen size={18} />
+                    <h2>데이터 가져오기</h2>
                   </div>
-                  <div className="template-chip-list">
-                    {group.columns.slice(0, 5).map((column) => (
-                      <span key={column}>{column}</span>
+                  <strong>{hasPlayers ? `${players.length}명의 선수단 데이터가 준비됐습니다` : "FM24 export를 기다리고 있습니다"}</strong>
+                  <span>
+                    {hasPlayers
+                      ? lastSource ?? "로컬에 저장된 선수단 데이터를 사용 중입니다"
+                      : "HTML, TXT, CSV export 또는 지정한 export 폴더를 사용할 수 있습니다"}
+                  </span>
+                </div>
+                <div className="command-actions">
+                  <button className="primary-button" onClick={() => fileInputRef.current?.click()}>
+                    <FileUp size={18} />
+                    파일 선택
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    className="hidden-input"
+                    type="file"
+                    multiple
+                    accept=".html,.htm,.txt,.csv"
+                    onChange={(event) => {
+                      if (event.currentTarget.files) {
+                        void handleFiles(event.currentTarget.files);
+                        event.currentTarget.value = "";
+                      }
+                    }}
+                  />
+                  {window.fmCoach && (
+                    <button className="secondary-button" onClick={() => void chooseExportFolder()}>
+                      <FolderOpen size={18} />
+                      폴더 선택
+                    </button>
+                  )}
+                  <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void loadBridgeData()}>
+                    <FolderSync size={18} />
+                    동기화
+                  </button>
+                </div>
+                <div className={`bridge-strip ${bridgeStatus.connected ? "connected" : "offline"}`}>
+                  <span>
+                    <FolderSync size={16} />
+                    {bridgeStatus.connected ? `${bridgeStatus.sourceCount ?? 0}개 파일` : bridgeStatusLabel(bridgeStatus.message)}
+                  </span>
+                  <span>{bridgeStatus.squadPlayerCount ?? bridgeStatus.playerCount ?? players.length}명 선수단</span>
+                  <span>{bridgeStatus.targetPlayerCount ?? 0}명 영입 후보</span>
+                  {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
+                </div>
+
+                <div className="prep-guide">
+                  <div className="prep-head">
+                    <div className="panel-title compact">
+                      <ClipboardList size={18} />
+                      <h2>FM View 준비</h2>
+                    </div>
+                    <button className="mini-action-button" onClick={copyTemplateColumns}>
+                      {templateCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
+                      {templateCopied ? "복사됨" : "능력치 복사"}
+                    </button>
+                  </div>
+                  <div className="prep-steps">
+                    <span><strong>1</strong> 선수단 View</span>
+                    <span><strong>2</strong> 능력치 포함</span>
+                    <span><strong>3</strong> HTML/TXT/CSV export</span>
+                  </div>
+                  <div className="ability-template-row">
+                    {exportTemplateGroups.map((group) => (
+                      <div className="ability-template-card" key={group.id}>
+                        <div className="template-group-head">
+                          <strong>{group.label}</strong>
+                          <span>{group.columns.length}개</span>
+                        </div>
+                        <div className="template-chip-list">
+                          {group.columns.slice(0, 5).map((column) => (
+                            <span key={column}>{column}</span>
+                          ))}
+                          {group.columns.length > 5 && <span>+{group.columns.length - 5}</span>}
+                        </div>
+                      </div>
                     ))}
-                    {group.columns.length > 5 && <span>+{group.columns.length - 5}</span>}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
+              </section>
+            )}
 
-        <section className="summary-grid">
-          <Metric icon={<Users size={18} />} label="선수단" value={players.length} helper="로드된 선수" />
-          <Metric icon={<ShieldCheck size={18} />} label="Best XI" value={report.bestXi.length} helper="분석 가능 인원" />
-          <Metric icon={<Gauge size={18} />} label="품질 점수" value={quality.score} helper={qualityStatusLabel(quality.status)} />
-          <Metric icon={<Target size={18} />} label="보강 이슈" value={visibleNeeds.length} helper={mainNeed?.area ?? "대기 중"} />
-        </section>
-
-        <div className="desk-grid">
-          <section className="main-column">
+            {activeView === "overview" && (
+              <div className="view-stack">
             <section className="panel briefing-panel">
               <div className="section-head">
                 <div>
@@ -406,7 +448,14 @@ export default function App() {
                 <div className="key-player-list">
                   <span className="mini-heading">핵심 선수</span>
                   {briefing.keyPlayers.slice(0, 4).map(({ player, fit }) => (
-                    <button className="key-player" key={player.id} onClick={() => setSelectedId(player.id)}>
+                    <button
+                      className="key-player"
+                      key={player.id}
+                      onClick={() => {
+                        setSelectedId(player.id);
+                        setActiveView("player");
+                      }}
+                    >
                       <span>{player.name}</span>
                       <strong>{fit.score}</strong>
                     </button>
@@ -415,7 +464,10 @@ export default function App() {
                 </div>
               </div>
             </section>
+              </div>
+            )}
 
+            {activeView === "squad" && (
             <section className="panel squad-board">
               <div className="section-head">
                 <div>
@@ -460,7 +512,10 @@ export default function App() {
                         <tr
                           key={player.id}
                           className={player.id === selectedId ? "selected" : ""}
-                          onClick={() => setSelectedId(player.id)}
+                          onClick={() => {
+                            setSelectedId(player.id);
+                            setActiveView("player");
+                          }}
                         >
                           <td>
                             <strong>{player.name}</strong>
@@ -493,6 +548,40 @@ export default function App() {
                 </table>
               </div>
             </section>
+            )}
+
+            {activeView === "reports" && (
+              <div className="reports-view">
+                <section className="panel quality-panel">
+                  <div className="section-head simple">
+                    <div className="panel-title compact">
+                      <Gauge size={18} />
+                      <h2>데이터 품질</h2>
+                    </div>
+                    {quality.status === "good" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                  </div>
+                  <div className={`quality-score ${quality.status}`}>
+                    <strong>{quality.score}</strong>
+                    <span>{qualityStatusLabel(quality.status)}</span>
+                  </div>
+                  <div className="quality-meter" aria-hidden="true">
+                    <span style={{ width: `${quality.score}%` }} />
+                  </div>
+                  <p className="quality-note">
+                    {quality.playerCount}명 · 평균 능력치 {quality.averageAttributesPerPlayer}개
+                  </p>
+                  <div className="quality-list">
+                    {[...quality.warnings, ...quality.recommendations].slice(0, 4).map((item) => (
+                      <p key={item}>{item}</p>
+                    ))}
+                    {batch?.warnings.map((warning) => (
+                      <p key={warning}>{warning}</p>
+                    ))}
+                    {bridgeStatus.warnings?.map((warning) => (
+                      <p key={warning}>{warning}</p>
+                    ))}
+                  </div>
+                </section>
 
             <div className="report-grid">
               <ReportPanel icon={<Target size={18} />} title="역할 적합도">
@@ -529,9 +618,10 @@ export default function App() {
                 {visibleTacticalNotes.length === 0 && <p className="muted">전술 메모 대기 중</p>}
               </ReportPanel>
             </div>
-          </section>
+              </div>
+            )}
 
-          <aside className="side-column">
+            {activeView === "player" && (
             <section className="panel player-focus">
               <div className="panel-title compact">
                 <Activity size={18} />
@@ -573,39 +663,10 @@ export default function App() {
                 <button title="현재 선수단의 보강 우선순위를 묻습니다" disabled={!hasPlayers} onClick={() => askAssistant("보강 우선순위는?")}>보강 우선</button>
               </div>
             </section>
+            )}
 
-            <section className="panel quality-panel">
-              <div className="section-head simple">
-                <div className="panel-title compact">
-                  <Gauge size={18} />
-                  <h2>데이터 품질</h2>
-                </div>
-                {quality.status === "good" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-              </div>
-              <div className={`quality-score ${quality.status}`}>
-                <strong>{quality.score}</strong>
-                <span>{qualityStatusLabel(quality.status)}</span>
-              </div>
-              <div className="quality-meter" aria-hidden="true">
-                <span style={{ width: `${quality.score}%` }} />
-              </div>
-              <p className="quality-note">
-                {quality.playerCount}명 · 평균 능력치 {quality.averageAttributesPerPlayer}개
-              </p>
-              <div className="quality-list">
-                {[...quality.warnings, ...quality.recommendations].slice(0, 4).map((item) => (
-                  <p key={item}>{item}</p>
-                ))}
-                {batch?.warnings.map((warning) => (
-                  <p key={warning}>{warning}</p>
-                ))}
-                {bridgeStatus.warnings?.map((warning) => (
-                  <p key={warning}>{warning}</p>
-                ))}
-              </div>
-            </section>
-
-            <section className="panel chat-panel">
+            {activeView === "chat" && (
+            <section className="panel chat-panel chat-view">
               <div className="panel-title compact">
                 <MessageSquare size={18} />
                 <h2>코치 대화</h2>
@@ -636,7 +697,8 @@ export default function App() {
                 </button>
               </form>
             </section>
-          </aside>
+            )}
+          </section>
         </div>
       </main>
     </div>

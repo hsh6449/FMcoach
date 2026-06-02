@@ -2,6 +2,8 @@ import { attributeLabel } from "./attributeCatalog";
 import { roleDefinitions } from "./roleDefinitions";
 import type { AttributeKey, Player, RoleDefinition, RoleFit } from "../types/domain";
 
+export type PositionGroup = RoleDefinition["family"] | "unknown";
+
 export function scorePlayerForRole(player: Player, role: RoleDefinition): RoleFit {
   const entries = Object.entries(role.weights) as Array<[AttributeKey, number]>;
   const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
@@ -55,14 +57,23 @@ export function squadAverage(players: Player[], keys: AttributeKey[]): number {
   return round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
-export function positionGroup(position: string): "goalkeeper" | "defender" | "midfielder" | "wide" | "attacker" | "unknown" {
-  const value = position.toUpperCase();
-  if (value.includes("GK")) return "goalkeeper";
-  if (value.includes("ST") || value.includes("SC")) return "attacker";
-  if (value.includes("AM L") || value.includes("AM R") || value.includes("AML") || value.includes("AMR") || value.includes("WB") || value.includes("D L") || value.includes("D R") || value.includes("ML") || value.includes("MR")) return "wide";
-  if (value.includes("D C") || value.includes("DC") || value.includes("CB")) return "defender";
-  if (value.includes("DM") || value.includes("M C") || value.includes("MC") || value.includes("AM C") || value.includes("AMC")) return "midfielder";
-  return "unknown";
+export function positionGroup(position: string): PositionGroup {
+  return positionGroups(position)[0] ?? "unknown";
+}
+
+export function positionGroups(position: string): PositionGroup[] {
+  const value = normalizePositionText(position);
+  const groups = new Set<RoleDefinition["family"]>();
+
+  if (matchesAny(value, [/\bGK\b/])) groups.add("goalkeeper");
+  if (matchesAny(value, [/\bD\s*C\b/, /\bDC\b/, /\bCB\b/])) groups.add("centerBack");
+  if (matchesAny(value, [/\bD\s*[LR]\b/, /\bD[LR]\b/, /\bFB\s*[LR]\b/, /\bFB[LR]\b/])) groups.add("fullBack");
+  if (matchesAny(value, [/\bWB\s*[LR]\b/, /\bWB[LR]\b/])) groups.add("wingBack");
+  if (matchesAny(value, [/\bDM\b/, /\bM\s*C\b/, /\bMC\b/, /\bAM\s*[CLR]\b/, /\bAM[CLR]\b/])) groups.add("midfielder");
+  if (matchesAny(value, [/\bM\s*[LR]\b/, /\bM[LR]\b/, /\bW\s*[LR]\b/, /\bW[LR]\b/])) groups.add("wing");
+  if (matchesAny(value, [/\bST\b/, /\bS\s*C\b/, /\bSC\b/])) groups.add("attacker");
+
+  return groups.size > 0 ? [...groups] : ["unknown"];
 }
 
 function matchesPosition(playerPosition: string, rolePositions: string[]): boolean {
@@ -72,6 +83,18 @@ function matchesPosition(playerPosition: string, rolePositions: string[]): boole
 
 function normalizePosition(value: string): string {
   return value.toUpperCase().replace(/[()]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function normalizePositionText(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[(),/|-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function matchesAny(value: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(value));
 }
 
 function round(value: number): number {

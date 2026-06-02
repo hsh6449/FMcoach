@@ -1,12 +1,14 @@
 import { roleDefinitions } from "./roleDefinitions";
-import { positionGroup, squadAverage, topFits } from "./scoring";
+import { positionGroup, positionGroups, squadAverage, topFits } from "./scoring";
 import type { AttributeKey, CoachReport, Player, SquadNeed } from "../types/domain";
 
 const POSITION_LABELS = {
   goalkeeper: "골키퍼",
-  defender: "센터백",
+  centerBack: "센터백",
+  fullBack: "풀백",
+  wingBack: "윙백",
   midfielder: "중앙 미드필더",
-  wide: "측면",
+  wing: "윙",
   attacker: "스트라이커",
   unknown: "미분류"
 };
@@ -84,15 +86,15 @@ function answerPlayerQuestion(question: string, player: Player): string {
 function selectBestXi(players: Player[]): Player[] {
   const slots = [
     { label: "GK", family: "goalkeeper" },
-    { label: "DC", family: "defender" },
-    { label: "DC", family: "defender" },
-    { label: "FB", family: "wide" },
-    { label: "FB", family: "wide" },
+    { label: "DC", family: "centerBack" },
+    { label: "DC", family: "centerBack" },
+    { label: "FB", family: "fullBack" },
+    { label: "FB", family: "fullBack" },
     { label: "DM/MC", family: "midfielder" },
     { label: "MC", family: "midfielder" },
     { label: "AM", family: "midfielder" },
-    { label: "W", family: "wide" },
-    { label: "W", family: "wide" },
+    { label: "W", family: "wing" },
+    { label: "W", family: "wing" },
     { label: "ST", family: "attacker" }
   ] as const;
 
@@ -105,9 +107,9 @@ function selectBestXi(players: Player[]): Player[] {
       .map((player) => ({
         player,
         fit: topFits(player, 1)[0],
-        group: positionGroup(player.position)
+        groups: positionGroups(player.position)
       }))
-      .filter((item) => item.group === slot.family || item.fit.family === slot.family)
+      .filter((item) => item.groups.includes(slot.family) || item.fit.family === slot.family)
       .sort((a, b) => b.fit.score - a.fit.score)[0];
 
     if (candidate) {
@@ -121,11 +123,11 @@ function selectBestXi(players: Player[]): Player[] {
 
 function detectSquadNeeds(players: Player[]): SquadNeed[] {
   const needs: SquadNeed[] = [];
-  const groups = ["goalkeeper", "defender", "midfielder", "wide", "attacker"] as const;
-  const minimums = { goalkeeper: 2, defender: 4, midfielder: 5, wide: 4, attacker: 2 };
+  const groups = ["goalkeeper", "centerBack", "fullBack", "wingBack", "midfielder", "wing", "attacker"] as const;
+  const minimums = { goalkeeper: 2, centerBack: 4, fullBack: 2, wingBack: 2, midfielder: 5, wing: 2, attacker: 2 };
 
   for (const group of groups) {
-    const groupPlayers = players.filter((player) => positionGroup(player.position) === group);
+    const groupPlayers = players.filter((player) => positionGroups(player.position).includes(group));
     if (groupPlayers.length < minimums[group]) {
       needs.push({
         area: POSITION_LABELS[group],
@@ -187,7 +189,7 @@ function trainingForPlayer(player: Player): { focus: string; reason: string } {
     return { focus: "Final Third", reason: "공격수로 쓰려면 결정력/침착성 보완 가치가 큽니다." };
   }
 
-  if ((attrs.tackling ?? 20) <= 10 && ["defender", "midfielder"].includes(positionGroup(player.position))) {
+  if ((attrs.tackling ?? 20) <= 10 && ["centerBack", "fullBack", "wingBack", "midfielder"].includes(positionGroup(player.position))) {
     return { focus: "Defending", reason: "태클과 수비 위치선정이 안정되면 전술 리스크가 줄어듭니다." };
   }
 

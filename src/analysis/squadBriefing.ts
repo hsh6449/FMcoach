@@ -1,4 +1,4 @@
-import { positionGroup, topFits } from "./scoring";
+import { positionGroups, topFits } from "./scoring";
 import type { Player, RoleDefinition, RoleFit } from "../types/domain";
 
 export type DepthBand = {
@@ -28,9 +28,11 @@ export type SquadBriefing = {
 
 const DEPTH_CONFIG: Array<{ id: RoleDefinition["family"]; label: string; minimum: number }> = [
   { id: "goalkeeper", label: "GK", minimum: 2 },
-  { id: "defender", label: "CB", minimum: 4 },
+  { id: "centerBack", label: "CB", minimum: 4 },
+  { id: "fullBack", label: "FB", minimum: 2 },
+  { id: "wingBack", label: "WB", minimum: 2 },
   { id: "midfielder", label: "CM", minimum: 5 },
-  { id: "wide", label: "Wide", minimum: 4 },
+  { id: "wing", label: "Wing", minimum: 2 },
   { id: "attacker", label: "ST", minimum: 2 }
 ];
 
@@ -70,7 +72,7 @@ export function buildSquadBriefing(players: Player[]): SquadBriefing {
 function buildDepth(players: Player[]): DepthBand[] {
   return DEPTH_CONFIG.map((config) => {
     const groupPlayers = players
-      .filter((player) => positionGroup(player.position) === config.id)
+      .filter((player) => positionGroups(player.position).includes(config.id))
       .map((player) => ({ player, fit: topFits(player, 1)[0] }))
       .sort((a, b) => b.fit.score - a.fit.score);
     const count = groupPlayers.length;
@@ -180,11 +182,12 @@ function buildNextActions(depth: DepthBand[], watchlist: BriefingItem[]): Briefi
 }
 
 function calculateReadiness(depth: DepthBand[], watchlist: BriefingItem[]): number {
+  const maxPerBand = 100 / Math.max(depth.length, 1);
   const depthScore = depth.reduce((sum, band) => {
-    if (band.status === "deep") return sum + 20;
-    if (band.status === "ok") return sum + 17;
-    if (band.status === "thin") return sum + 9;
-    return sum + 2;
+    if (band.status === "deep") return sum + maxPerBand;
+    if (band.status === "ok") return sum + maxPerBand * 0.85;
+    if (band.status === "thin") return sum + maxPerBand * 0.45;
+    return sum + maxPerBand * 0.1;
   }, 0);
   const riskPenalty = watchlist.reduce((sum, item) => {
     if (item.severity === "high") return sum + 10;

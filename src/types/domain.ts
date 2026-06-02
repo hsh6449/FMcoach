@@ -70,7 +70,7 @@ export type ImportBatch = {
 export type RoleDefinition = {
   id: string;
   name: string;
-  family: "goalkeeper" | "defender" | "midfielder" | "wide" | "attacker";
+  family: "goalkeeper" | "centerBack" | "fullBack" | "wingBack" | "midfielder" | "wing" | "attacker";
   positions: string[];
   weights: Partial<Record<AttributeKey, number>>;
 };

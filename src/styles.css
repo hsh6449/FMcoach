@@ -832,6 +832,25 @@ p {
   gap: 3px;
 }
 
+.player-name-link {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #17231d;
+  text-align: left;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+
+.player-name-link:hover {
+  color: #176a4b;
+  text-decoration-color: #176a4b;
+}
+
 .player-table td:first-child span {
   color: #748078;
   font-size: 12px;
@@ -922,6 +941,15 @@ p {
 .player-card {
   display: grid;
   gap: 10px;
+}
+
+.player-detail .section-head {
+  align-items: center;
+}
+
+.player-empty {
+  min-height: 220px;
+  align-content: center;
 }
 
 .player-card h3 {
@@ -1280,7 +1308,7 @@ p {
 
   .app-menu {
     position: static;
-    grid-template-columns: repeat(6, minmax(146px, 1fr));
+    grid-template-columns: repeat(5, minmax(146px, 1fr));
     overflow-x: auto;
   }
 

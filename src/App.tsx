@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertCircle,
+  ArrowLeft,
   BarChart3,
   CheckCircle2,
   ClipboardList,
@@ -93,8 +94,7 @@ export default function App() {
   const coachMenu: Array<{ id: AppView; label: string; helper: string; icon: ReactNode }> = [
     { id: "overview", label: "개요", helper: "오늘의 판단", icon: <Sparkles size={18} /> },
     { id: "prepare", label: "데이터 준비", helper: "Export / View", icon: <FolderOpen size={18} /> },
-    { id: "squad", label: "선수단", helper: "검색 / 비교", icon: <BarChart3 size={18} /> },
-    { id: "player", label: "선수", helper: selectedPlayer?.name ?? "개인 분석", icon: <Activity size={18} /> },
+    { id: "squad", label: "선수단", helper: "목록 / 개인 분석", icon: <BarChart3 size={18} /> },
     { id: "reports", label: "리포트", helper: "역할 / 영입", icon: <ClipboardList size={18} /> },
     { id: "chat", label: "코치 대화", helper: "질문하기", icon: <MessageSquare size={18} /> }
   ];
@@ -265,6 +265,14 @@ export default function App() {
     copyTextFallback(text);
   }
 
+  function isMenuItemActive(id: AppView) {
+    if (id === "squad") {
+      return activeView === "squad" || activeView === "player";
+    }
+
+    return activeView === id;
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -297,7 +305,7 @@ export default function App() {
             <span className="menu-kicker">메뉴</span>
             {coachMenu.map((item) => (
               <button
-                className={`menu-button ${activeView === item.id ? "active" : ""}`}
+                className={`menu-button ${isMenuItemActive(item.id) ? "active" : ""}`}
                 key={item.id}
                 onClick={() => setActiveView(item.id)}
               >
@@ -512,13 +520,17 @@ export default function App() {
                         <tr
                           key={player.id}
                           className={player.id === selectedId ? "selected" : ""}
-                          onClick={() => {
-                            setSelectedId(player.id);
-                            setActiveView("player");
-                          }}
                         >
                           <td>
-                            <strong>{player.name}</strong>
+                            <button
+                              className="player-name-link"
+                              onClick={() => {
+                                setSelectedId(player.id);
+                                setActiveView("player");
+                              }}
+                            >
+                              {player.name}
+                            </button>
                             <span>{player.club ?? player.nationality ?? ""}</span>
                           </td>
                           <td>{player.position || "-"}</td>
@@ -622,17 +634,17 @@ export default function App() {
             )}
 
             {activeView === "player" && (
-            <section className="panel player-focus">
-              <div className="panel-title compact">
-                <Activity size={18} />
-                <h2>선택 선수</h2>
+            <section className="panel player-focus player-detail">
+              <div className="section-head simple">
+                <div className="panel-title">
+                  <Activity size={18} />
+                  <h2>선수 분석</h2>
+                </div>
+                <button className="secondary-button" onClick={() => setActiveView("squad")}>
+                  <ArrowLeft size={16} />
+                  선수단
+                </button>
               </div>
-              <select value={selectedId ?? ""} onChange={(event) => setSelectedId(event.target.value || undefined)}>
-                <option value="">선택 없음</option>
-                {players.map((player) => (
-                  <option key={player.id} value={player.id}>{player.name}</option>
-                ))}
-              </select>
               {selectedPlayer ? (
                 <div className="player-card">
                   <h3>{selectedPlayer.name}</h3>
@@ -651,7 +663,13 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <p className="muted">선수 상세 대기 중</p>
+                <div className="empty-state player-empty">
+                  <Users size={24} />
+                  <strong>선수단에서 이름을 클릭해 주세요</strong>
+                  <button className="secondary-button" onClick={() => setActiveView("squad")}>
+                    선수단 보기
+                  </button>
+                </div>
               )}
               <div className="quick-actions-head">
                 <strong>빠른 질문</strong>

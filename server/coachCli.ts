@@ -3,15 +3,18 @@ import { stdin as input, stdout as output } from "node:process";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { answerQuestion, buildCoachReport } from "../src/analysis/advisor";
+import { compareTarget, findPlayer, rankTargets, type TargetRecommendation } from "../src/analysis/recruitment";
 import { topFits } from "../src/analysis/scoring";
 import type { CoachReport, ImportBatch, Player } from "../src/types/domain";
-import { parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder";
+import { parseArgs, scanExportFolder, type ExportFileInfo, type ExportFolderScan } from "./exportFolder";
 
 type CliState = {
   batch: ImportBatch;
   files: ExportFileInfo[];
   report: CoachReport;
   selected?: Player;
+  squadPlayers: Player[];
+  targetPlayers: Player[];
   watchDir: string;
 };
 
@@ -94,7 +97,17 @@ async function handleCommand(command: string) {
   }
 
   if (name === "/players") {
-    printPlayers(state.batch.players, rest);
+    printPlayers(state.squadPlayers, rest);
+    return;
+  }
+
+  if (name === "/targets") {
+    printTargets(rest);
+    return;
+  }
+
+  if (name === "/compare") {
+    printCompare(rest);
     return;
   }
 
@@ -108,25 +121,28 @@ async function handleCommand(command: string) {
 
 async function loadState(folder: string): Promise<CliState> {
   const scan = await scanExportFolder(folder);
-  const report = buildCoachReport(scan.batch.players);
+  const { squadPlayers, targetPlayers } = splitScanPlayers(scan);
+  const report = buildCoachReport(squadPlayers);
 
   return {
     batch: scan.batch,
     files: scan.files,
     report,
+    squadPlayers,
+    targetPlayers,
     selected: undefined,
     watchDir: folder
   };
 }
 
 function askCoach(question: string) {
-  if (state.batch.players.length === 0) {
+  if (state.squadPlayers.length === 0) {
     console.log("아직 읽은 선수가 없습니다. FM24에서 export한 뒤 /sync를 실행해 주세요.");
     return;
   }
 
   const scopedQuestion = state.selected ? `${state.selected.name} 기준으로 ${question}` : question;
-  console.log(answerQuestion(scopedQuestion, state.batch.players, state.report));
+  console.log(answerQuestion(scopedQuestion, state.squadPlayers, state.report));
 }
 
 function selectPlayer(query: string) {
@@ -139,7 +155,7 @@ function selectPlayer(query: string) {
     return;
   }
 
-  const player = findPlayer(query, state.batch.players);
+  const player = findPlayer(query, state.squadPlayers);
   if (!player) {
     console.log(`'${query}'에 맞는 선수를 찾지 못했습니다.`);
     return;
@@ -154,7 +170,7 @@ function selectPlayer(query: string) {
 function printBanner(current: CliState) {
   console.log("FM Coach Terminal");
   console.log(`watch: ${current.watchDir}`);
-  console.log(`${current.batch.players.length} players, ${current.files.length} export files loaded`);
+  console.log(`${current.squadPlayers.length} squad players, ${current.targetPlayers.length} targets, ${current.files.length} export files loaded`);
   printHelp();
 }
 
@@ -164,6 +180,8 @@ function printHelp() {
     "/sync - export 폴더 다시 읽기",
     "/summary - 스쿼드 요약",
     "/players [검색어] - 선수 목록",
+    "/targets [검색어/포지션/역할] - 영입 후보 랭킹",
+    "/compare 후보명 [vs 기존선수명] - 후보 비교",
     "/player 선수명 - 선수 context 선택",
     "/files - 읽은 export 파일",
     "/quit - 종료",
@@ -177,7 +195,8 @@ function printSummary(current: CliState) {
   const best = current.report.bestXi.slice(0, 11).map((player, index) => `${index + 1}. ${player.name} (${player.position || "?"})`);
 
   console.log([
-    `선수: ${current.batch.players.length}명`,
+    `선수단: ${current.squadPlayers.length}명`,
+    `영입 후보: ${current.targetPlayers.length}명`,
     `파일: ${current.files.length}개`,
     "",
     "베스트 XI 초안:",
@@ -197,7 +216,7 @@ function printFiles(files: ExportFileInfo[]) {
     return;
   }
 
-  console.log(files.map((file) => `- ${file.name} (${Math.round(file.size / 1024)} KB)`).join("\n"));
+  console.log(files.map((file) => `- [${file.kind}] ${file.name} (${Math.round(file.size / 1024)} KB)`).join("\n"));
 }
 
 function printPlayers(players: Player[], query: string) {
@@ -213,9 +232,83 @@ function printPlayers(players: Player[], query: string) {
   }).join("\n"));
 }
 
-function findPlayer(query: string, players: Player[]): Player | undefined {
-  const normalized = query.toLowerCase().replace(/\s+/g, "");
-  return players.find((player) => player.name.toLowerCase().replace(/\s+/g, "").includes(normalized));
+function printTargets(query: string) {
+  if (state.targetPlayers.length === 0) {
+    console.log("영입 후보 export를 찾지 못했습니다. 파일명에 target, shortlist, scout, search, transfer 중 하나를 넣어두면 후보군으로 분류합니다.");
+    return;
+  }
+
+  const recommendations = rankTargets(state.squadPlayers, state.targetPlayers, query, 15);
+  if (recommendations.length === 0) {
+    console.log("조건에 맞는 영입 후보가 없습니다.");
+    return;
+  }
+
+  console.log(recommendations.map(formatTargetLine).join("\n"));
+}
+
+function printCompare(rest: string) {
+  if (!rest) {
+    console.log("/compare 후보명 또는 /compare 후보명 vs 기존선수명 형식으로 입력해 주세요.");
+    return;
+  }
+
+  const [candidateQuery, incumbentQuery = ""] = rest.split(/\s+vs\s+/i).map((item) => item.trim());
+  const candidate = findPlayer(candidateQuery, state.targetPlayers);
+
+  if (!candidate) {
+    console.log(`'${candidateQuery}'에 맞는 영입 후보를 찾지 못했습니다.`);
+    return;
+  }
+
+  const recommendation = compareTarget(state.squadPlayers, candidate, incumbentQuery);
+  console.log(formatTargetDetail(recommendation));
+}
+
+function splitScanPlayers(scan: ExportFolderScan): { squadPlayers: Player[]; targetPlayers: Player[] } {
+  const squadSources = scan.sources.filter((source) => source.kind === "squad");
+  const targetSources = scan.sources.filter((source) => source.kind === "targets");
+
+  return {
+    squadPlayers: mergePlayers(squadSources.length > 0 ? squadSources.flatMap((source) => source.batch.players) : scan.batch.players),
+    targetPlayers: mergePlayers(targetSources.flatMap((source) => source.batch.players))
+  };
+}
+
+function mergePlayers(players: Player[]): Player[] {
+  const byId = new Map<string, Player>();
+
+  for (const player of players) {
+    const previous = byId.get(player.id);
+    byId.set(player.id, previous ? {
+      ...previous,
+      ...player,
+      attributes: { ...previous.attributes, ...player.attributes },
+      raw: { ...previous.raw, ...player.raw }
+    } : player);
+  }
+
+  return [...byId.values()];
+}
+
+function formatTargetLine(item: TargetRecommendation): string {
+  const incumbent = item.incumbent ? ` vs ${item.incumbent.name} ${item.upgrade >= 0 ? "+" : ""}${item.upgrade}` : " no incumbent";
+  return `- ${item.candidate.name} (${item.candidate.position || "?"}) · ${item.bestFit.roleName} ${item.bestFit.score}/20 · ${item.verdict}${incumbent}`;
+}
+
+function formatTargetDetail(item: TargetRecommendation): string {
+  return [
+    `${item.candidate.name} (${item.candidate.position || "포지션 미상"})`,
+    `평가: ${item.verdict}`,
+    `후보 점수: ${item.score}`,
+    `최적 역할: ${item.bestFit.roleName} ${item.bestFit.score}/20`,
+    item.incumbent && item.incumbentFit
+      ? `비교 대상: ${item.incumbent.name} ${item.incumbentFit.roleName} ${item.incumbentFit.score}/20 (${item.upgrade >= 0 ? "+" : ""}${item.upgrade})`
+      : "비교 대상: 없음",
+    "",
+    "근거:",
+    item.reasons.map((reason) => `- ${reason}`).join("\n")
+  ].join("\n");
 }
 
 async function readAllInput(): Promise<string> {

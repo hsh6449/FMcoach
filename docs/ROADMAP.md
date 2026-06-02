@@ -5,6 +5,7 @@
 - Parse FM24 squad/player-search exports.
 - Watch an export folder through the local bridge server.
 - Offer terminal-only coaching for fast use beside FM.
+- Rank shortlist/player-search exports against the current squad.
 - Normalize key attributes and basic profile fields.
 - Score common role fits.
 - Recommend training focus and transfer priorities.

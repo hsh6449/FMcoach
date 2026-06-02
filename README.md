@@ -46,9 +46,13 @@ Useful terminal commands:
 - `/sync`: rescan the export folder
 - `/summary`: show squad summary
 - `/players [search]`: list players
+- `/targets [search]`: rank recruitment candidates from shortlist/search exports
+- `/compare target [vs player]`: compare a candidate with the best matching squad player or a named incumbent
 - `/player name`: set the current player context
 - `/files`: list imported export files
 - `/quit`: exit
+
+The terminal coach classifies files by name. Use names like `squad.html` for your own squad and `targets-shortlist.html`, `scout-search.html`, or `transfer-candidates.csv` for recruitment exports.
 
 ## FM24 Data Flow
 
@@ -59,6 +63,8 @@ Useful terminal commands:
 5. Ask the coach about a player, training focus, tactical fit, or transfer needs.
 
 You can use either the browser dashboard or the terminal coach. Both read the same export-folder data.
+
+For recruitment, FM still does the huge-database search. FM Coach reads the exported result set and ranks it against your own squad.
 
 ## Architecture
 

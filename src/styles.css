@@ -375,6 +375,77 @@ p {
   white-space: nowrap;
 }
 
+.data-sync-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e3e9e2;
+}
+
+.sync-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #526159;
+}
+
+.data-sync-row.synced .sync-copy {
+  color: #176a4b;
+}
+
+.data-sync-row.pending .sync-copy {
+  color: #9a651b;
+}
+
+.sync-copy div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.sync-copy strong {
+  color: #1f3028;
+  font-size: 13px;
+}
+
+.sync-copy span {
+  color: #66746b;
+  font-size: 12px;
+}
+
+.sync-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.sync-toggle {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid #d8dfd8;
+  border-radius: 999px;
+  background: #f9fbf8;
+  color: #35453b;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sync-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: #176a4b;
+}
+
 .prep-guide {
   grid-column: 1 / -1;
   display: grid;

@@ -6,7 +6,9 @@ import type { CodexRunResult } from "../server/codexRunner";
 export type DesktopStatus = {
   ok: boolean;
   watchDir: string;
+  dataVersion?: string;
   lastScanAt?: string;
+  latestFileAt?: string;
   playerCount: number;
   sourceCount: number;
   squadPlayerCount?: number;

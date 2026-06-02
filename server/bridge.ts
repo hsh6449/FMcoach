@@ -7,14 +7,16 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ImportBatch } from "../src/types/domain";
 import { ensureCoachContextDir, readCoachResponse, writeCoachContext, type CoachContextRequest } from "./coachContext";
 import { runCodexHandoff } from "./codexRunner";
-import { parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder";
+import { buildExportDataVersion, parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder";
 
 type BridgeState = {
   batch: ImportBatch;
   squadBatch: ImportBatch;
   targetBatch: ImportBatch;
   files: ExportFileInfo[];
+  dataVersion?: string;
   lastScanAt?: string;
+  latestFileAt?: string;
   watchDir: string;
   warnings: string[];
 };
@@ -72,6 +74,8 @@ async function route(request: IncomingMessage, response: ServerResponse) {
       targetPlayerCount: state.targetBatch.players.length,
       allPlayerCount: state.batch.players.length,
       contextDir,
+      dataVersion: state.dataVersion,
+      latestFileAt: state.latestFileAt,
       warnings: [...state.warnings, ...state.squadBatch.warnings]
     });
     return;
@@ -137,7 +141,10 @@ async function route(request: IncomingMessage, response: ServerResponse) {
       playerCount: state.squadBatch.players.length,
       squadPlayerCount: state.squadBatch.players.length,
       targetPlayerCount: state.targetBatch.players.length,
-      contextDir
+      allPlayerCount: state.batch.players.length,
+      contextDir,
+      dataVersion: state.dataVersion,
+      latestFileAt: state.latestFileAt
     });
     return;
   }
@@ -153,7 +160,9 @@ async function scanExports() {
     squadBatch: scan.squadBatch,
     targetBatch: scan.targetBatch,
     files: scan.files,
+    dataVersion: buildExportDataVersion(scan),
     lastScanAt: new Date().toISOString(),
+    latestFileAt: scan.files[0]?.modifiedAt,
     watchDir,
     warnings: scan.warnings
   };

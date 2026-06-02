@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { ImportBatch } from "../src/types/domain";
 import { ensureCoachContextDir, readCoachResponse, writeCoachContext, type CoachContextRequest } from "../server/coachContext";
 import { runCodexHandoff } from "../server/codexRunner";
-import { scanExportFolder, type ExportFileInfo, type SourceBatch } from "../server/exportFolder";
+import { buildExportDataVersion, scanExportFolder, type ExportFileInfo, type SourceBatch } from "../server/exportFolder";
 
 type AppConfig = {
   watchDir?: string;
@@ -16,7 +16,9 @@ type DesktopState = {
   squadBatch: ImportBatch;
   targetBatch: ImportBatch;
   files: ExportFileInfo[];
+  dataVersion?: string;
   lastScanAt?: string;
+  latestFileAt?: string;
   sources: SourceBatch[];
   warnings: string[];
   watchDir: string;
@@ -136,7 +138,9 @@ async function scanExports() {
     squadBatch: scan.squadBatch,
     targetBatch: scan.targetBatch,
     files: scan.files,
+    dataVersion: buildExportDataVersion(scan),
     lastScanAt: new Date().toISOString(),
+    latestFileAt: scan.files[0]?.modifiedAt,
     sources: scan.sources,
     warnings: scan.warnings
   };
@@ -182,6 +186,8 @@ function statusPayload() {
     targetPlayerCount: state.targetBatch.players.length,
     allPlayerCount: state.batch.players.length,
     contextDir: coachContextDir(),
+    dataVersion: state.dataVersion,
+    latestFileAt: state.latestFileAt,
     warnings: [...state.warnings, ...state.squadBatch.warnings],
     watchDir: state.watchDir
   };

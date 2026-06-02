@@ -39,12 +39,16 @@ import type { BriefingItem, DepthBand } from "./analysis/squadBriefing";
 import type { ChatMessage, ImportBatch, Player } from "./types/domain";
 
 const STORAGE_KEY = "fm-coach:batch";
+const ACTIVE_DATA_VERSION_KEY = "fm-coach:active-data-version";
+const AUTO_SYNC_KEY = "fm-coach:auto-sync";
 const BRIDGE_POLL_INTERVAL_MS = 5000;
 
 type BridgeStatus = {
   connected: boolean;
   contextDir?: string;
+  dataVersion?: string;
   lastScanAt?: string;
+  latestFileAt?: string;
   message?: string;
   playerCount?: number;
   sourceCount?: number;
@@ -114,11 +118,15 @@ type SessionLine = {
 };
 
 export default function App() {
-  const [batch, setBatch] = useState<ImportBatch | undefined>(() => loadBatch());
+  const [initialData] = useState(() => loadInitialData());
+  const [batch, setBatch] = useState<ImportBatch | undefined>(initialData.batch);
   const [activeView, setActiveView] = useState<AppView>("overview");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [contextText, setContextText] = useState("");
+  const [activeDataVersion, setActiveDataVersion] = useState(initialData.version);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => localStorage.getItem(AUTO_SYNC_KEY) !== "false");
+  const [isSyncing, setIsSyncing] = useState(false);
   const [coachContextStatus, setCoachContextStatus] = useState("Codex 요청 파일을 만들 수 있습니다.");
   const [coachContextResult, setCoachContextResult] = useState<CoachContextWriteResult | undefined>();
   const [coachContextAnswer, setCoachContextAnswer] = useState<CoachContextAnswer | undefined>();
@@ -136,7 +144,11 @@ export default function App() {
     }
   ]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeDataVersionRef = useRef(activeDataVersion);
+  const autoSyncEnabledRef = useRef(autoSyncEnabled);
+  const batchRef = useRef(batch);
   const bridgeAutoLoadedRef = useRef(false);
+  const bridgeLoadInFlightRef = useRef(false);
 
   const players = batch?.players ?? [];
   const report = useMemo(() => buildCoachReport(players), [players]);
@@ -146,6 +158,10 @@ export default function App() {
   const selectedFits = selectedPlayer ? topFits(selectedPlayer, 3) : [];
   const filteredPlayers = useMemo(() => filterPlayers(players, query), [players, query]);
   const hasPlayers = players.length > 0;
+  const bridgePlayerCount = bridgeStatus.squadPlayerCount ?? bridgeStatus.playerCount ?? 0;
+  const hasBridgeData = bridgeStatus.connected && bridgePlayerCount > 0 && Boolean(bridgeStatus.dataVersion);
+  const hasPendingBridgeUpdate = hasBridgeData && activeDataVersion !== "" && bridgeStatus.dataVersion !== activeDataVersion;
+  const isBridgeDataSynced = hasBridgeData && bridgeStatus.dataVersion === activeDataVersion;
   const visibleNeeds = hasPlayers ? report.needs : [];
   const visibleTransferPriorities = hasPlayers ? report.transferPriorities : [];
   const visibleTacticalNotes = hasPlayers ? report.tacticalNotes : [];
@@ -166,6 +182,22 @@ export default function App() {
   }, [batch]);
 
   useEffect(() => {
+    batchRef.current = batch;
+  }, [batch]);
+
+  useEffect(() => {
+    activeDataVersionRef.current = activeDataVersion;
+    if (activeDataVersion) {
+      localStorage.setItem(ACTIVE_DATA_VERSION_KEY, activeDataVersion);
+    }
+  }, [activeDataVersion]);
+
+  useEffect(() => {
+    autoSyncEnabledRef.current = autoSyncEnabled;
+    localStorage.setItem(AUTO_SYNC_KEY, autoSyncEnabled ? "true" : "false");
+  }, [autoSyncEnabled]);
+
+  useEffect(() => {
     void checkBridge(true);
     const interval = window.setInterval(() => {
       void checkBridge(false);
@@ -176,8 +208,7 @@ export default function App() {
 
   async function handleFiles(files: FileList | File[]) {
     const nextBatch = await parseFiles([...files]);
-    setBatch(nextBatch);
-    setSelectedId(nextBatch.players[0]?.id);
+    applyBatch(nextBatch, deriveBatchVersion(nextBatch, "manual"), true);
     setActiveView("overview");
     setMessages((items) => [
       ...items,
@@ -198,12 +229,9 @@ export default function App() {
     if (window.fmCoach) {
       try {
         const status = await window.fmCoach.getStatus();
-        setBridgeStatus({ ...status, connected: true, message: "Desktop app" });
-
-        if (autoLoad && !bridgeAutoLoadedRef.current && status.playerCount > 0 && !batch) {
-          bridgeAutoLoadedRef.current = true;
-          await loadBridgeData(false, false);
-        }
+        const nextStatus = { ...status, connected: true, message: "Desktop app" };
+        setBridgeStatus(nextStatus);
+        await maybeLoadBridgeData(nextStatus, autoLoad);
       } catch {
         setBridgeStatus({ connected: false, message: "Desktop bridge is not ready" });
       }
@@ -212,28 +240,71 @@ export default function App() {
 
     try {
       const status = await fetchJson<BridgeStatusResponse>("/api/status");
-      setBridgeStatus({ ...status, connected: true });
-
-      if (autoLoad && !bridgeAutoLoadedRef.current && status.playerCount && status.playerCount > 0 && !batch) {
-        bridgeAutoLoadedRef.current = true;
-        await loadBridgeData(false, false);
-      }
+      const nextStatus = { ...status, connected: true };
+      setBridgeStatus(nextStatus);
+      await maybeLoadBridgeData(nextStatus, autoLoad);
     } catch {
       setBridgeStatus({ connected: false, message: "Bridge server is not running" });
     }
   }
 
-  async function loadBridgeData(announce = true, rescan = true) {
-    if (window.fmCoach) {
-      if (rescan) {
-        const status = await window.fmCoach.rescan();
-        setBridgeStatus({ ...status, connected: true, message: "Desktop app" });
-      }
+  async function maybeLoadBridgeData(status: BridgeStatus, autoLoad: boolean) {
+    const nextPlayerCount = status.squadPlayerCount ?? status.playerCount ?? 0;
+    const hasRemoteData = status.connected && nextPlayerCount > 0 && Boolean(status.dataVersion);
+    const isInitialAutoLoad = autoLoad && !bridgeAutoLoadedRef.current && hasRemoteData && !batchRef.current;
+    const isNewVersion = hasRemoteData && status.dataVersion !== activeDataVersionRef.current;
+    const shouldAutoSync = autoSyncEnabledRef.current && isNewVersion;
 
-      const nextBatch = await window.fmCoach.getBatch();
-      setBatch(nextBatch);
-      setSelectedId((current) => current ?? nextBatch.players[0]?.id);
-      setActiveView("overview");
+    if ((!isInitialAutoLoad && !shouldAutoSync) || bridgeLoadInFlightRef.current) {
+      return;
+    }
+
+    bridgeAutoLoadedRef.current = true;
+    await loadBridgeData(false, false, status, false);
+  }
+
+  async function loadBridgeData(announce = true, rescan = true, knownStatus?: BridgeStatus, focusOverview = true) {
+    bridgeLoadInFlightRef.current = true;
+    setIsSyncing(true);
+
+    if (window.fmCoach) {
+      try {
+        const status = rescan || !knownStatus
+          ? await window.fmCoach.rescan()
+          : knownStatus;
+        const nextStatus = { ...status, connected: true, message: "Desktop app" };
+        setBridgeStatus(nextStatus);
+
+        const nextBatch = await window.fmCoach.getBatch();
+        applyBatch(nextBatch, nextStatus.dataVersion ?? deriveBatchVersion(nextBatch, "desktop"), focusOverview);
+
+        if (announce) {
+          setMessages((items) => [
+            ...items,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: `Export 폴더에서 ${nextBatch.players.length}명의 선수를 반영했습니다. 이제 화면과 Codex 요청 기준이 같은 데이터입니다.`
+            }
+          ]);
+        }
+      } finally {
+        setIsSyncing(false);
+        bridgeLoadInFlightRef.current = false;
+      }
+      return;
+    }
+
+    try {
+      let status: BridgeStatus | BridgeStatusResponse | undefined = knownStatus;
+      if (rescan || !status) {
+        status = await fetchJson<BridgeStatusResponse>("/api/rescan", { method: "POST" });
+      }
+      const nextStatus = { ...status, connected: true };
+      setBridgeStatus(nextStatus);
+
+      const nextBatch = await fetchJson<ImportBatch>("/api/batch");
+      applyBatch(nextBatch, nextStatus.dataVersion ?? deriveBatchVersion(nextBatch, "bridge"), focusOverview);
 
       if (announce) {
         setMessages((items) => [
@@ -241,32 +312,13 @@ export default function App() {
           {
             id: crypto.randomUUID(),
             role: "assistant",
-            content: `Export 폴더에서 ${nextBatch.players.length}명의 선수를 동기화했습니다. FM에서 새로 export하면 Sync Folder를 누르면 됩니다.`
+            content: `Export Bridge에서 ${nextBatch.players.length}명의 선수를 반영했습니다. 이제 화면과 Codex 요청 기준이 같은 데이터입니다.`
           }
         ]);
       }
-      return;
-    }
-
-    if (rescan) {
-      await fetch("/api/rescan", { method: "POST" }).catch(() => undefined);
-    }
-
-    const nextBatch = await fetchJson<ImportBatch>("/api/batch");
-    setBatch(nextBatch);
-    setSelectedId((current) => current ?? nextBatch.players[0]?.id);
-    setActiveView("overview");
-    await checkBridge(false);
-
-    if (announce) {
-      setMessages((items) => [
-        ...items,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `Export Bridge에서 ${nextBatch.players.length}명의 선수를 동기화했습니다. FM에서 새로 export하면 다시 Sync를 누르거나 잠시 뒤 갱신할 수 있어요.`
-        }
-      ]);
+    } finally {
+      setIsSyncing(false);
+      bridgeLoadInFlightRef.current = false;
     }
   }
 
@@ -276,13 +328,30 @@ export default function App() {
     }
 
     const status = await window.fmCoach.chooseExportFolder();
-    setBridgeStatus({ ...status, connected: true, message: "Desktop app" });
-    await loadBridgeData(true, false);
+    const nextStatus = { ...status, connected: true, message: "Desktop app" };
+    setBridgeStatus(nextStatus);
+    await loadBridgeData(true, false, nextStatus);
+  }
+
+  function applyBatch(nextBatch: ImportBatch, version: string, focusOverview: boolean) {
+    setBatch(nextBatch);
+    setActiveDataVersion(version);
+    setSelectedId((current) =>
+      current && nextBatch.players.some((player) => player.id === current)
+        ? current
+        : nextBatch.players[0]?.id
+    );
+
+    if (focusOverview) {
+      setActiveView("overview");
+    }
   }
 
   function clearData() {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(ACTIVE_DATA_VERSION_KEY);
     setBatch(undefined);
+    setActiveDataVersion("");
     setSelectedId(undefined);
     setContextText("");
     setActiveView("prepare");
@@ -449,7 +518,11 @@ export default function App() {
         <div className="header-actions">
           <StatusPill
             connected={bridgeStatus.connected}
-            label={bridgeStatus.connected ? (window.fmCoach ? "Desktop 연결됨" : "Bridge 연결됨") : "수동 import"}
+            label={bridgeStatus.connected
+              ? hasPendingBridgeUpdate
+                ? "새 데이터 감지"
+                : window.fmCoach ? "Desktop 연결됨" : "Bridge 연결됨"
+              : "수동 import"}
           />
           <button className="icon-button" title="샘플 데이터 불러오기" onClick={loadSample}>
             <Database size={18} />
@@ -532,7 +605,7 @@ export default function App() {
                   )}
                   <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void loadBridgeData()}>
                     <FolderSync size={18} />
-                    동기화
+                    {isSyncing ? "반영 중" : "지금 반영"}
                   </button>
                 </div>
                 <div className={`bridge-strip ${bridgeStatus.connected ? "connected" : "offline"}`}>
@@ -543,6 +616,29 @@ export default function App() {
                   <span>{bridgeStatus.squadPlayerCount ?? bridgeStatus.playerCount ?? players.length}명 선수단</span>
                   <span>{bridgeStatus.targetPlayerCount ?? 0}명 영입 후보</span>
                   {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
+                </div>
+                <div className={`data-sync-row ${hasPendingBridgeUpdate ? "pending" : isBridgeDataSynced ? "synced" : "idle"}`}>
+                  <div className="sync-copy">
+                    <Activity size={16} />
+                    <div>
+                      <strong>{dataSyncTitle({ bridgeStatus, hasPendingBridgeUpdate, isBridgeDataSynced, isSyncing })}</strong>
+                      <span>{dataSyncDetail({ activeDataVersion, bridgeStatus, hasBridgeData, latestFileAt: bridgeStatus.latestFileAt })}</span>
+                    </div>
+                  </div>
+                  <div className="sync-controls">
+                    <label className="sync-toggle">
+                      <input
+                        type="checkbox"
+                        checked={autoSyncEnabled}
+                        onChange={(event) => setAutoSyncEnabled(event.currentTarget.checked)}
+                      />
+                      <span>자동 반영</span>
+                    </label>
+                    <button className="mini-action-button" disabled={!bridgeStatus.connected || isSyncing} onClick={() => void loadBridgeData(false, false, bridgeStatus, false)}>
+                      <RefreshCcw size={15} />
+                      반영
+                    </button>
+                  </div>
                 </div>
 
                 <div className="prep-guide">
@@ -880,7 +976,7 @@ export default function App() {
                   <span>{coachContextStatus}</span>
                 </div>
                 <div className="handoff-actions">
-                  <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void createCoachContextRequest()}>
+                  <button className="secondary-button" disabled={!bridgeStatus.connected || hasPendingBridgeUpdate} onClick={() => void createCoachContextRequest()}>
                     <FileUp size={16} />
                     Codex 요청 생성
                   </button>
@@ -1090,6 +1186,63 @@ function bridgeStatusLabel(message?: string): string {
   return message;
 }
 
+function dataSyncTitle(input: {
+  bridgeStatus: BridgeStatus;
+  hasPendingBridgeUpdate: boolean;
+  isBridgeDataSynced: boolean;
+  isSyncing: boolean;
+}): string {
+  if (input.isSyncing) {
+    return "Export 데이터를 반영하는 중";
+  }
+  if (!input.bridgeStatus.connected) {
+    return "Export 폴더 연결 대기";
+  }
+  if (input.hasPendingBridgeUpdate) {
+    return "새 export 데이터 발견";
+  }
+  if (input.isBridgeDataSynced) {
+    return "화면 데이터와 export 데이터가 일치";
+  }
+  return "반영할 export 데이터 대기";
+}
+
+function dataSyncDetail(input: {
+  activeDataVersion: string;
+  bridgeStatus: BridgeStatus;
+  hasBridgeData: boolean;
+  latestFileAt?: string;
+}): string {
+  if (!input.bridgeStatus.connected) {
+    return "Bridge 또는 Desktop 앱이 연결되면 폴더 상태를 확인합니다.";
+  }
+  if (!input.hasBridgeData) {
+    return "감시 폴더에 선수단 export 파일이 아직 없습니다.";
+  }
+
+  const fileTime = formatSyncTime(input.latestFileAt ?? input.bridgeStatus.lastScanAt);
+  const visible = input.activeDataVersion ? "화면 기준 있음" : "화면 기준 없음";
+  return `${visible} · 최근 export ${fileTime}`;
+}
+
+function formatSyncTime(value?: string): string {
+  if (!value) {
+    return "시간 미상";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "numeric",
+    day: "numeric"
+  });
+}
+
 function defaultCoachContextQuestion(selectedPlayer: Player | undefined): string {
   if (selectedPlayer) {
     return `${selectedPlayer.name}을 현재 스쿼드에서 어떤 역할로 쓰는 게 좋은지, 어떤 동료 역할이 보조해야 하는지 분석해 주세요.`;
@@ -1141,6 +1294,16 @@ function copyTextFallback(text: string) {
   document.body.removeChild(textarea);
 }
 
+function loadInitialData(): { batch?: ImportBatch; version: string } {
+  const batch = loadBatch();
+  const savedVersion = localStorage.getItem(ACTIVE_DATA_VERSION_KEY);
+
+  return {
+    batch,
+    version: savedVersion ?? (batch ? deriveBatchVersion(batch, "stored") : "")
+  };
+}
+
 function loadBatch(): ImportBatch | undefined {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
@@ -1152,6 +1315,15 @@ function loadBatch(): ImportBatch | undefined {
   } catch {
     return undefined;
   }
+}
+
+function deriveBatchVersion(batch: ImportBatch, source: string): string {
+  return [
+    source,
+    batch.importedAt,
+    `players=${batch.players.length}`,
+    `sources=${batch.sourceNames.join("|")}`
+  ].join(";");
 }
 
 function filterPlayers(players: Player[], query: string): Player[] {

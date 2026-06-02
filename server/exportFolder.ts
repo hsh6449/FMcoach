@@ -29,6 +29,21 @@ export type ExportFolderScan = {
   warnings: string[];
 };
 
+export function buildExportDataVersion(scan: Pick<ExportFolderScan, "batch" | "files" | "squadBatch" | "targetBatch">): string {
+  const fileFingerprint = scan.files
+    .map((file) => [file.kind, file.name, file.size, file.modifiedAt].join(":"))
+    .sort()
+    .join("|");
+
+  return [
+    `files=${scan.files.length}`,
+    `squad=${scan.squadBatch.players.length}`,
+    `targets=${scan.targetBatch.players.length}`,
+    `all=${scan.batch.players.length}`,
+    fileFingerprint || "empty"
+  ].join(";");
+}
+
 export async function scanExportFolder(watchDir: string): Promise<ExportFolderScan> {
   const warnings: string[] = [];
   const files = await listExportFiles(watchDir).catch((error: unknown) => {

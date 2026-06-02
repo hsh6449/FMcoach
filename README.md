@@ -133,6 +133,10 @@ app creates latest-request.md/json
 
 If Codex is installed in a non-standard location, set `FM_COACH_CODEX_BIN=/path/to/codex`. This is the first terminal-connection experiment. A fuller embedded terminal/chat panel can wrap the same file protocol without changing the data contract.
 
+## Data Sync Policy
+
+The export bridge computes a `dataVersion` from watched file names, modified times, sizes, file kinds, and parsed player counts. The app keeps a separate active data version for what is currently displayed. If the watched export version changes, the app can auto-apply it or show a pending state with a manual apply button. Codex request creation is disabled while displayed data and watched export data are out of sync.
+
 ## Next Steps
 
 - Add a desktop shell with always-on-top overlay behavior.

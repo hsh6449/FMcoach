@@ -1,4 +1,4 @@
-import { attributeCatalog } from "../analysis/attributeCatalog";
+import type { AttributeKey } from "../types/domain";
 
 export type ExportTemplateGroup = {
   id: string;
@@ -7,35 +7,108 @@ export type ExportTemplateGroup = {
   columns: string[];
 };
 
-const identityColumns = ["Name", "Position", "Age", "Club", "Nation"];
-const squadColumns = ["Value", "Wage", "Personality", "Morale"];
-const conditionColumns = ["Condition", "Match Sharpness", "Apps", "Goals", "Assists", "Mins", "Av Rat"];
-const attributeColumns = attributeCatalog.map((attribute) => attribute.label);
+const attributeLabels: Record<AttributeKey, string> = {
+  corners: "Corners",
+  crossing: "Crossing",
+  dribbling: "Dribbling",
+  finishing: "Finishing",
+  firstTouch: "First Touch",
+  freeKickTaking: "Free Kick Taking",
+  heading: "Heading",
+  longShots: "Long Shots",
+  longThrows: "Long Throws",
+  marking: "Marking",
+  passing: "Passing",
+  penaltyTaking: "Penalty Taking",
+  tackling: "Tackling",
+  technique: "Technique",
+  aggression: "Aggression",
+  anticipation: "Anticipation",
+  bravery: "Bravery",
+  composure: "Composure",
+  concentration: "Concentration",
+  decisions: "Decisions",
+  determination: "Determination",
+  flair: "Flair",
+  leadership: "Leadership",
+  offTheBall: "Off The Ball",
+  positioning: "Positioning",
+  teamwork: "Teamwork",
+  vision: "Vision",
+  workRate: "Work Rate",
+  acceleration: "Acceleration",
+  agility: "Agility",
+  balance: "Balance",
+  jumpingReach: "Jumping Reach",
+  naturalFitness: "Natural Fitness",
+  pace: "Pace",
+  stamina: "Stamina",
+  strength: "Strength"
+};
+
+const technicalAttributes: AttributeKey[] = [
+  "corners",
+  "crossing",
+  "dribbling",
+  "finishing",
+  "firstTouch",
+  "freeKickTaking",
+  "heading",
+  "longShots",
+  "longThrows",
+  "marking",
+  "passing",
+  "penaltyTaking",
+  "tackling",
+  "technique"
+];
+
+const mentalAttributes: AttributeKey[] = [
+  "aggression",
+  "anticipation",
+  "bravery",
+  "composure",
+  "concentration",
+  "decisions",
+  "determination",
+  "flair",
+  "leadership",
+  "offTheBall",
+  "positioning",
+  "teamwork",
+  "vision",
+  "workRate"
+];
+
+const physicalAttributes: AttributeKey[] = [
+  "acceleration",
+  "agility",
+  "balance",
+  "jumpingReach",
+  "naturalFitness",
+  "pace",
+  "stamina",
+  "strength"
+];
 
 export const exportTemplateGroups: ExportTemplateGroup[] = [
   {
-    id: "identity",
-    label: "기본 정보",
-    description: "선수 식별과 포지션 분류에 필요합니다.",
-    columns: identityColumns
+    id: "technical",
+    label: "기술적 능력",
+    description: "FM 선수 프로필의 Technical 영역입니다.",
+    columns: technicalAttributes.map((key) => attributeLabels[key])
   },
   {
-    id: "squad",
-    label: "계약/선수단",
-    description: "영입 우선순위와 장기 리스크 판단에 씁니다.",
-    columns: squadColumns
+    id: "mental",
+    label: "정신적 능력",
+    description: "FM 선수 프로필의 Mental 영역입니다.",
+    columns: mentalAttributes.map((key) => attributeLabels[key])
   },
   {
-    id: "condition",
-    label: "상태/기록",
-    description: "훈련, 기용, 로테이션 조언에 필요합니다.",
-    columns: conditionColumns
-  },
-  {
-    id: "attributes",
-    label: "능력치",
-    description: "역할 적합도와 전술 성향 분석의 핵심입니다.",
-    columns: attributeColumns
+    id: "physical",
+    label: "신체적 능력",
+    description: "FM 선수 프로필의 Physical 영역입니다.",
+    columns: physicalAttributes.map((key) => attributeLabels[key])
   }
 ];
 

@@ -529,10 +529,14 @@ export default function App() {
               ) : (
                 <p className="muted">선수 상세 대기 중</p>
               )}
+              <div className="quick-actions-head">
+                <strong>빠른 질문</strong>
+                <span>선택 선수나 현재 선수단 기준으로 코치 대화에 바로 질문합니다.</span>
+              </div>
               <div className="quick-actions">
-                <button disabled={!hasPlayers} onClick={() => askAssistant("이 선수 훈련 뭐가 좋아?")}>훈련</button>
-                <button disabled={!hasPlayers} onClick={() => askAssistant("이 선수 역할은?")}>역할</button>
-                <button disabled={!hasPlayers} onClick={() => askAssistant("보강 우선순위는?")}>영입</button>
+                <button title="선택 선수의 훈련 포커스를 묻습니다" disabled={!hasPlayers} onClick={() => askAssistant("이 선수 훈련 뭐가 좋아?")}>훈련 질문</button>
+                <button title="선택 선수의 역할 적합도를 묻습니다" disabled={!hasPlayers} onClick={() => askAssistant("이 선수 역할은?")}>역할 질문</button>
+                <button title="현재 선수단의 보강 우선순위를 묻습니다" disabled={!hasPlayers} onClick={() => askAssistant("보강 우선순위는?")}>영입 질문</button>
               </div>
             </section>
 
@@ -579,7 +583,7 @@ export default function App() {
                 </button>
               </div>
               <p className="template-note">
-                FM24 선수단 View에 아래 컬럼을 넣고 export하면 분석 정확도가 가장 안정적입니다.
+                FM 선수 프로필에 있는 능력치 템플릿 기준입니다. 기술적/정신적/신체적 능력치를 그대로 확인하거나 복사할 수 있습니다.
               </p>
               <div className="template-groups">
                 {exportTemplateGroups.map((group) => (

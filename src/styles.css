@@ -808,14 +808,33 @@ p {
   white-space: nowrap;
 }
 
-.quick-actions {
-  gap: 8px;
+.quick-actions-head {
+  display: grid;
+  gap: 3px;
   margin-top: 12px;
 }
 
+.quick-actions-head strong {
+  color: #26362e;
+  font-size: 13px;
+}
+
+.quick-actions-head span {
+  color: #66746b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.quick-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .quick-actions button {
-  flex: 1;
+  flex: 1 1 92px;
   min-height: 36px;
+  padding: 0 9px;
   border: 1px solid #cfd8cf;
   border-radius: 8px;
   background: #ffffff;

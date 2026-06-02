@@ -9,6 +9,8 @@ import { parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder
 
 type BridgeState = {
   batch: ImportBatch;
+  squadBatch: ImportBatch;
+  targetBatch: ImportBatch;
   files: ExportFileInfo[];
   lastScanAt?: string;
   watchDir: string;
@@ -30,6 +32,8 @@ const emptyBatch: ImportBatch = {
 
 let state: BridgeState = {
   batch: emptyBatch,
+  squadBatch: emptyBatch,
+  targetBatch: emptyBatch,
   files: [],
   watchDir,
   warnings: []
@@ -56,16 +60,29 @@ async function route(request: IncomingMessage, response: ServerResponse) {
       ok: true,
       watchDir: state.watchDir,
       lastScanAt: state.lastScanAt,
-      playerCount: state.batch.players.length,
-      sourceCount: state.batch.sourceNames.length,
-      sources: state.batch.sourceNames,
-      warnings: [...state.warnings, ...state.batch.warnings]
+      playerCount: state.squadBatch.players.length,
+      sourceCount: state.squadBatch.sourceNames.length,
+      sources: state.squadBatch.sourceNames,
+      squadPlayerCount: state.squadBatch.players.length,
+      targetPlayerCount: state.targetBatch.players.length,
+      allPlayerCount: state.batch.players.length,
+      warnings: [...state.warnings, ...state.squadBatch.warnings]
     });
     return;
   }
 
   if (url.pathname === "/api/batch") {
+    sendJson(response, state.squadBatch);
+    return;
+  }
+
+  if (url.pathname === "/api/all-batch") {
     sendJson(response, state.batch);
+    return;
+  }
+
+  if (url.pathname === "/api/targets") {
+    sendJson(response, state.targetBatch);
     return;
   }
 
@@ -76,7 +93,13 @@ async function route(request: IncomingMessage, response: ServerResponse) {
 
   if (url.pathname === "/api/rescan" && request.method === "POST") {
     await scanExports();
-    sendJson(response, { ok: true, lastScanAt: state.lastScanAt, playerCount: state.batch.players.length });
+    sendJson(response, {
+      ok: true,
+      lastScanAt: state.lastScanAt,
+      playerCount: state.squadBatch.players.length,
+      squadPlayerCount: state.squadBatch.players.length,
+      targetPlayerCount: state.targetBatch.players.length
+    });
     return;
   }
 
@@ -88,6 +111,8 @@ async function scanExports() {
 
   state = {
     batch: scan.batch,
+    squadBatch: scan.squadBatch,
+    targetBatch: scan.targetBatch,
     files: scan.files,
     lastScanAt: new Date().toISOString(),
     watchDir,

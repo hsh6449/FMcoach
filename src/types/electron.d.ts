@@ -6,6 +6,9 @@ export type DesktopStatus = {
   lastScanAt?: string;
   playerCount: number;
   sourceCount: number;
+  squadPlayerCount?: number;
+  targetPlayerCount?: number;
+  allPlayerCount?: number;
   sources: string[];
   warnings: string[];
 };
@@ -15,6 +18,8 @@ declare global {
     fmCoach?: {
       chooseExportFolder: () => Promise<DesktopStatus>;
       getBatch: () => Promise<ImportBatch>;
+      getTargets: () => Promise<ImportBatch>;
+      getAllBatch: () => Promise<ImportBatch>;
       getStatus: () => Promise<DesktopStatus>;
       rescan: () => Promise<DesktopStatus>;
     };

@@ -69,6 +69,8 @@ Useful terminal commands:
 
 The terminal coach classifies files by name. Use names like `squad.html` for your own squad and `targets-shortlist.html`, `scout-search.html`, or `transfer-candidates.csv` for recruitment exports.
 
+The desktop dashboard also uses this classification. Squad analysis only uses files classified as `squad`; recruitment exports stay out of the squad report so candidate files do not pollute your own team data.
+
 For experimental FMF inspection:
 
 ```bash
@@ -88,6 +90,8 @@ See `docs/FMF_LAB.md` for the FMF investigation plan.
 You can use either the browser dashboard or the terminal coach. Both read the same export-folder data.
 
 For recruitment, FM still does the huge-database search. FM Coach reads the exported result set and ranks it against your own squad.
+
+For the first milestone, focus on the `Data Quality` panel. A good squad export should have name/position coverage near 100% and enough core attributes for role scoring.
 
 ## Architecture
 

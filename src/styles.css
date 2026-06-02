@@ -270,6 +270,59 @@ button {
   font-size: 24px;
 }
 
+.quality-score {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid #393832;
+  border-radius: 8px;
+  background: #1d1c18;
+}
+
+.quality-score strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.quality-score span {
+  color: #c9c3ad;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.quality-score.good {
+  border-color: #32604f;
+}
+
+.quality-score.partial {
+  border-color: #776f52;
+}
+
+.quality-score.poor,
+.quality-score.empty {
+  border-color: #5c4b3c;
+}
+
+.quality-note {
+  margin: 9px 0 0;
+  color: #aaa38d;
+  font-size: 12px;
+}
+
+.quality-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.quality-list p {
+  margin: 0;
+  color: #c9c3ad;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .context-panel select {
   width: 100%;
   height: 38px;

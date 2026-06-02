@@ -21,6 +21,9 @@ export type SourceBatch = {
 
 export type ExportFolderScan = {
   batch: ImportBatch;
+  squadBatch: ImportBatch;
+  targetBatch: ImportBatch;
+  statsBatch: ImportBatch;
   files: ExportFileInfo[];
   sources: SourceBatch[];
   warnings: string[];
@@ -56,6 +59,9 @@ export async function scanExportFolder(watchDir: string): Promise<ExportFolderSc
 
   return {
     batch: parseExportBatch(sources),
+    squadBatch: batchForKind(sourceBatches, "squad", ["unknown", "stats"]),
+    targetBatch: batchForKind(sourceBatches, "targets", []),
+    statsBatch: batchForKind(sourceBatches, "stats", []),
     files: fileDetails.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt)),
     sources: sourceBatches,
     warnings
@@ -122,4 +128,34 @@ function classifyExport(name: string): ExportKind {
   }
 
   return "unknown";
+}
+
+function batchForKind(sourceBatches: SourceBatch[], primaryKind: ExportKind, fallbackKinds: ExportKind[]): ImportBatch {
+  const primary = sourceBatches.filter((source) => source.kind === primaryKind);
+  const selected = primary.length > 0
+    ? primary
+    : sourceBatches.filter((source) => fallbackKinds.includes(source.kind));
+
+  return {
+    importedAt: new Date().toISOString(),
+    sourceNames: selected.map((source) => source.name),
+    players: mergePlayers(selected.flatMap((source) => source.batch.players)),
+    warnings: selected.flatMap((source) => source.batch.warnings)
+  };
+}
+
+function mergePlayers(players: ImportBatch["players"]): ImportBatch["players"] {
+  const byId = new Map<string, ImportBatch["players"][number]>();
+
+  for (const player of players) {
+    const previous = byId.get(player.id);
+    byId.set(player.id, previous ? {
+      ...previous,
+      ...player,
+      attributes: { ...previous.attributes, ...player.attributes },
+      raw: { ...previous.raw, ...player.raw }
+    } : player);
+  }
+
+  return [...byId.values()];
 }

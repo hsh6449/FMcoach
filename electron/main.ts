@@ -11,6 +11,8 @@ type AppConfig = {
 
 type DesktopState = {
   batch: ImportBatch;
+  squadBatch: ImportBatch;
+  targetBatch: ImportBatch;
   files: ExportFileInfo[];
   lastScanAt?: string;
   sources: SourceBatch[];
@@ -34,6 +36,8 @@ app.whenReady().then(async () => {
   const config = await loadConfig();
   state = {
     batch: emptyBatch,
+    squadBatch: emptyBatch,
+    targetBatch: emptyBatch,
     files: [],
     sources: [],
     warnings: [],
@@ -79,7 +83,9 @@ function createWindow() {
 
 function registerIpc() {
   ipcMain.handle("fmCoach:getStatus", () => statusPayload());
-  ipcMain.handle("fmCoach:getBatch", () => state.batch);
+  ipcMain.handle("fmCoach:getBatch", () => state.squadBatch);
+  ipcMain.handle("fmCoach:getTargets", () => state.targetBatch);
+  ipcMain.handle("fmCoach:getAllBatch", () => state.batch);
   ipcMain.handle("fmCoach:rescan", async () => {
     await scanExports();
     return statusPayload();
@@ -109,6 +115,8 @@ async function scanExports() {
   state = {
     ...state,
     batch: scan.batch,
+    squadBatch: scan.squadBatch,
+    targetBatch: scan.targetBatch,
     files: scan.files,
     lastScanAt: new Date().toISOString(),
     sources: scan.sources,
@@ -149,10 +157,13 @@ function statusPayload() {
   return {
     ok: true,
     lastScanAt: state.lastScanAt,
-    playerCount: state.batch.players.length,
-    sourceCount: state.batch.sourceNames.length,
-    sources: state.batch.sourceNames,
-    warnings: [...state.warnings, ...state.batch.warnings],
+    playerCount: state.squadBatch.players.length,
+    sourceCount: state.squadBatch.sourceNames.length,
+    sources: state.squadBatch.sourceNames,
+    squadPlayerCount: state.squadBatch.players.length,
+    targetPlayerCount: state.targetBatch.players.length,
+    allPlayerCount: state.batch.players.length,
+    warnings: [...state.warnings, ...state.squadBatch.warnings],
     watchDir: state.watchDir
   };
 }

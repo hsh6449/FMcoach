@@ -6,7 +6,7 @@ import { answerQuestion, buildCoachReport } from "../src/analysis/advisor";
 import { compareTarget, findPlayer, rankTargets, type TargetRecommendation } from "../src/analysis/recruitment";
 import { topFits } from "../src/analysis/scoring";
 import type { CoachReport, ImportBatch, Player } from "../src/types/domain";
-import { parseArgs, scanExportFolder, type ExportFileInfo, type ExportFolderScan } from "./exportFolder";
+import { parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder";
 
 type CliState = {
   batch: ImportBatch;
@@ -121,11 +121,12 @@ async function handleCommand(command: string) {
 
 async function loadState(folder: string): Promise<CliState> {
   const scan = await scanExportFolder(folder);
-  const { squadPlayers, targetPlayers } = splitScanPlayers(scan);
+  const squadPlayers = scan.squadBatch.players;
+  const targetPlayers = scan.targetBatch.players;
   const report = buildCoachReport(squadPlayers);
 
   return {
-    batch: scan.batch,
+    batch: scan.squadBatch,
     files: scan.files,
     report,
     squadPlayers,
@@ -263,32 +264,6 @@ function printCompare(rest: string) {
 
   const recommendation = compareTarget(state.squadPlayers, candidate, incumbentQuery);
   console.log(formatTargetDetail(recommendation));
-}
-
-function splitScanPlayers(scan: ExportFolderScan): { squadPlayers: Player[]; targetPlayers: Player[] } {
-  const squadSources = scan.sources.filter((source) => source.kind === "squad");
-  const targetSources = scan.sources.filter((source) => source.kind === "targets");
-
-  return {
-    squadPlayers: mergePlayers(squadSources.length > 0 ? squadSources.flatMap((source) => source.batch.players) : scan.batch.players),
-    targetPlayers: mergePlayers(targetSources.flatMap((source) => source.batch.players))
-  };
-}
-
-function mergePlayers(players: Player[]): Player[] {
-  const byId = new Map<string, Player>();
-
-  for (const player of players) {
-    const previous = byId.get(player.id);
-    byId.set(player.id, previous ? {
-      ...previous,
-      ...player,
-      attributes: { ...previous.attributes, ...player.attributes },
-      raw: { ...previous.raw, ...player.raw }
-    } : player);
-  }
-
-  return [...byId.values()];
 }
 
 function formatTargetLine(item: TargetRecommendation): string {

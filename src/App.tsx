@@ -3,6 +3,7 @@ import {
   ClipboardList,
   Database,
   Dumbbell,
+  Gauge,
   FolderOpen,
   FolderSync,
   MessageSquare,
@@ -18,6 +19,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { answerQuestion, buildCoachReport } from "./analysis/advisor";
+import { buildDataQualityReport } from "./analysis/dataQuality";
 import { topFits } from "./analysis/scoring";
 import { sampleExport } from "./data/sampleExport";
 import { parseFiles } from "./parsers/fmExport";
@@ -32,6 +34,9 @@ type BridgeStatus = {
   message?: string;
   playerCount?: number;
   sourceCount?: number;
+  squadPlayerCount?: number;
+  targetPlayerCount?: number;
+  allPlayerCount?: number;
   sources?: string[];
   warnings?: string[];
   watchDir?: string;
@@ -59,6 +64,7 @@ export default function App() {
 
   const players = batch?.players ?? [];
   const report = useMemo(() => buildCoachReport(players), [players]);
+  const quality = useMemo(() => buildDataQualityReport(batch), [batch]);
   const selectedPlayer = players.find((player) => player.id === selectedId);
   const filteredPlayers = useMemo(() => filterPlayers(players, query), [players, query]);
 
@@ -258,7 +264,7 @@ export default function App() {
               </div>
               <p>
                 {bridgeStatus.connected
-                  ? `${bridgeStatus.sourceCount ?? 0} files · ${bridgeStatus.playerCount ?? 0} players`
+                  ? `${bridgeStatus.sourceCount ?? 0} squad files · ${bridgeStatus.squadPlayerCount ?? bridgeStatus.playerCount ?? 0} squad players · ${bridgeStatus.targetPlayerCount ?? 0} targets`
                   : bridgeStatus.message}
               </p>
               {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
@@ -300,6 +306,25 @@ export default function App() {
               <Metric label="Best XI" value={report.bestXi.length} />
               <Metric label="Needs" value={report.needs.length} />
               <Metric label="Files" value={batch?.sourceNames.length ?? 0} />
+            </div>
+          </section>
+
+          <section className="panel quality-panel">
+            <div className="panel-title">
+              <Gauge size={18} />
+              <h2>Data Quality</h2>
+            </div>
+            <div className={`quality-score ${quality.status}`}>
+              <strong>{quality.score}</strong>
+              <span>{quality.status}</span>
+            </div>
+            <p className="quality-note">
+              {quality.playerCount} players · {quality.averageAttributesPerPlayer} attrs/player
+            </p>
+            <div className="quality-list">
+              {[...quality.warnings, ...quality.recommendations].slice(0, 4).map((item) => (
+                <p key={item}>{item}</p>
+              ))}
             </div>
           </section>
 

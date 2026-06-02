@@ -4,6 +4,8 @@ import {
   BarChart3,
   CheckCircle2,
   ClipboardList,
+  ClipboardCheck,
+  Copy,
   Database,
   Dumbbell,
   FileUp,
@@ -28,6 +30,7 @@ import { answerQuestion, buildCoachReport } from "./analysis/advisor";
 import { buildDataQualityReport } from "./analysis/dataQuality";
 import { topFits } from "./analysis/scoring";
 import { buildSquadBriefing } from "./analysis/squadBriefing";
+import { exportTemplateColumns, exportTemplateGroups } from "./data/exportTemplate";
 import { sampleExport } from "./data/sampleExport";
 import { parseFiles } from "./parsers/fmExport";
 import type { BriefingItem, DepthBand } from "./analysis/squadBriefing";
@@ -59,6 +62,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [contextText, setContextText] = useState("");
+  const [templateCopied, setTemplateCopied] = useState(false);
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>({ connected: false, message: "Bridge not detected" });
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -230,6 +234,19 @@ export default function App() {
       { id: crypto.randomUUID(), role: "assistant", content: answer }
     ]);
     setContextText("");
+  }
+
+  function copyTemplateColumns() {
+    const text = exportTemplateColumns.join("\t");
+    setTemplateCopied(true);
+    window.setTimeout(() => setTemplateCopied(false), 1500);
+
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(text).catch(() => copyTextFallback(text));
+      return;
+    }
+
+    copyTextFallback(text);
   }
 
   return (
@@ -550,6 +567,39 @@ export default function App() {
               </div>
             </section>
 
+            <section className="panel template-panel">
+              <div className="section-head simple">
+                <div className="panel-title compact">
+                  <ClipboardList size={18} />
+                  <h2>능력치 템플릿</h2>
+                </div>
+                <button className="mini-action-button" onClick={copyTemplateColumns}>
+                  {templateCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
+                  {templateCopied ? "복사됨" : "컬럼 복사"}
+                </button>
+              </div>
+              <p className="template-note">
+                FM24 선수단 View에 아래 컬럼을 넣고 export하면 분석 정확도가 가장 안정적입니다.
+              </p>
+              <div className="template-groups">
+                {exportTemplateGroups.map((group) => (
+                  <div className="template-group" key={group.id}>
+                    <div className="template-group-head">
+                      <strong>{group.label}</strong>
+                      <span>{group.columns.length}개</span>
+                    </div>
+                    <p>{group.description}</p>
+                    <div className="template-chip-list">
+                      {group.columns.slice(0, 8).map((column) => (
+                        <span key={column}>{column}</span>
+                      ))}
+                      {group.columns.length > 8 && <span>+{group.columns.length - 8}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             <section className="panel chat-panel">
               <div className="panel-title compact">
                 <MessageSquare size={18} />
@@ -683,6 +733,18 @@ function bridgeStatusLabel(message?: string): string {
     return "Bridge 감지 안 됨";
   }
   return message;
+}
+
+function copyTextFallback(text: string) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
 }
 
 function loadBatch(): ImportBatch | undefined {

@@ -3,6 +3,7 @@
 ## Phase 1: Export-Based Coach
 
 - Parse FM24 squad/player-search exports.
+- Watch an export folder through the local bridge server.
 - Normalize key attributes and basic profile fields.
 - Score common role fits.
 - Recommend training focus and transfer priorities.
@@ -11,6 +12,7 @@
 ## Phase 2: Match and Season Context
 
 - Add adapters for player stats, team stats, fixtures, and match history exports.
+- Track file provenance so squad, stats, shortlist, and fixture exports can be refreshed independently.
 - Detect recent-form risk, fixture congestion, and role overuse.
 - Recommend rotation, recovery training, and opponent preparation.
 

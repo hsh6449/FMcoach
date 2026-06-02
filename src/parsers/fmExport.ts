@@ -3,6 +3,8 @@ import type { AttributeMap, ImportBatch, Player } from "../types/domain";
 
 type Row = Record<string, string>;
 
+export const SUPPORTED_EXPORT_EXTENSIONS = [".html", ".htm", ".txt", ".csv"] as const;
+
 const FIELD_ALIASES: Record<string, string[]> = {
   name: ["name", "player", "선수", "이름"],
   position: ["position", "positions", "pos", "best pos", "최적 포지션", "포지션"],
@@ -31,20 +33,24 @@ for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
 }
 
 export async function parseFiles(files: File[]): Promise<ImportBatch> {
-  const batches = await Promise.all(files.map((file) => parseFile(file)));
+  const sources = await Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })));
+  return parseExportBatch(sources);
+}
+
+export function parseExportBatch(sources: Array<{ name: string; text: string }>): ImportBatch {
+  const batches = sources.map((source) => parseExportText(source.name, source.text));
   const players = dedupePlayers(batches.flatMap((batch) => batch.players));
 
   return {
     importedAt: new Date().toISOString(),
-    sourceNames: files.map((file) => file.name),
+    sourceNames: sources.map((source) => source.name),
     players,
     warnings: batches.flatMap((batch) => batch.warnings)
   };
 }
 
-async function parseFile(file: File): Promise<ImportBatch> {
-  const text = await file.text();
-  const rows = file.name.toLowerCase().endsWith(".html") || text.includes("<table")
+export function parseExportText(name: string, text: string): ImportBatch {
+  const rows = name.toLowerCase().endsWith(".html") || name.toLowerCase().endsWith(".htm") || text.includes("<table")
     ? parseHtmlRows(text)
     : parseTextRows(text);
 
@@ -52,35 +58,36 @@ async function parseFile(file: File): Promise<ImportBatch> {
   const warnings: string[] = [];
 
   if (rows.length === 0) {
-    warnings.push(`${file.name}: 테이블을 찾지 못했습니다.`);
+    warnings.push(`${name}: 테이블을 찾지 못했습니다.`);
   }
 
   if (rows.length > 0 && players.length === 0) {
-    warnings.push(`${file.name}: 선수 이름 컬럼을 찾지 못했습니다.`);
+    warnings.push(`${name}: 선수 이름 컬럼을 찾지 못했습니다.`);
   }
 
   return {
     importedAt: new Date().toISOString(),
-    sourceNames: [file.name],
+    sourceNames: [name],
     players,
     warnings
   };
 }
 
 function parseHtmlRows(text: string): Row[] {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(text, "text/html");
-  const tables = [...doc.querySelectorAll("table")];
+  const tables = extractTagBlocks(text, "table");
   const rows: Row[] = [];
 
   for (const table of tables) {
-    const tableRows = [...table.querySelectorAll("tr")].map((tr) =>
-      [...tr.children].map((cell) => cleanCell(cell.textContent ?? ""))
-    );
+    const tableRows = extractTagBlocks(table, "tr").map((tr) => {
+      const headerCells = extractTagBlocks(tr, "th");
+      const dataCells = extractTagBlocks(tr, "td");
+      const cells = headerCells.length > 0 ? headerCells : dataCells;
+      return cells.map((cell) => cleanCell(decodeHtml(stripTags(cell))));
+    });
     rows.push(...matrixToRows(tableRows));
   }
 
-  return rows;
+  return rows.length > 0 ? rows : parseTextRows(stripTags(text));
 }
 
 function parseTextRows(text: string): Row[] {
@@ -191,6 +198,43 @@ function cleanCell(value: string): string {
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function extractTagBlocks(text: string, tag: string): string[] {
+  const pattern = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi");
+  return [...text.matchAll(pattern)].map((match) => match[1]);
+}
+
+function stripTags(value: string): string {
+  return value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:td|th)>/gi, "\t")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");
+}
+
+function decodeHtml(value: string): string {
+  const named: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    nbsp: " ",
+    quot: "\""
+  };
+
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (_, entity: string) => {
+    const normalized = entity.toLowerCase();
+    if (normalized.startsWith("#x")) {
+      return String.fromCodePoint(Number.parseInt(normalized.slice(2), 16));
+    }
+
+    if (normalized.startsWith("#")) {
+      return String.fromCodePoint(Number.parseInt(normalized.slice(1), 10));
+    }
+
+    return named[normalized] ?? `&${entity};`;
+  });
 }
 
 function detectDelimiter(header: string): RegExp | string {

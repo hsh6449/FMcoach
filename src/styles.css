@@ -180,6 +180,64 @@ button {
   line-height: 1.4;
 }
 
+.bridge-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid #4a493f;
+  border-radius: 8px;
+  background: #1d1c18;
+}
+
+.bridge-card.connected {
+  border-color: #32604f;
+}
+
+.bridge-card.offline {
+  border-color: #5c4b3c;
+}
+
+.bridge-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.bridge-head strong {
+  font-size: 13px;
+}
+
+.bridge-card p {
+  margin: 0;
+  color: #c9c3ad;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bridge-path {
+  display: block;
+  color: #918b78;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bridge-sync {
+  height: 32px;
+  border: 1px solid #4a493f;
+  border-radius: 7px;
+  background: #2b2a25;
+  color: #f4f1e8;
+}
+
+.bridge-sync:disabled {
+  cursor: not-allowed;
+  color: #777160;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

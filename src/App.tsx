@@ -4,6 +4,7 @@ import {
   Database,
   Dumbbell,
   FolderOpen,
+  FolderSync,
   MessageSquare,
   RefreshCcw,
   Search,
@@ -23,12 +24,29 @@ import { parseFiles } from "./parsers/fmExport";
 import type { ChatMessage, ImportBatch, Player } from "./types/domain";
 
 const STORAGE_KEY = "fm-coach:batch";
+const BRIDGE_POLL_INTERVAL_MS = 5000;
+
+type BridgeStatus = {
+  connected: boolean;
+  lastScanAt?: string;
+  message?: string;
+  playerCount?: number;
+  sourceCount?: number;
+  sources?: string[];
+  warnings?: string[];
+  watchDir?: string;
+};
+
+type BridgeStatusResponse = Omit<BridgeStatus, "connected" | "message"> & {
+  ok: boolean;
+};
 
 export default function App() {
   const [batch, setBatch] = useState<ImportBatch | undefined>(() => loadBatch());
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [contextText, setContextText] = useState("");
+  const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>({ connected: false, message: "Bridge not detected" });
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -37,6 +55,7 @@ export default function App() {
     }
   ]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bridgeAutoLoadedRef = useRef(false);
 
   const players = batch?.players ?? [];
   const report = useMemo(() => buildCoachReport(players), [players]);
@@ -48,6 +67,15 @@ export default function App() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(batch));
     }
   }, [batch]);
+
+  useEffect(() => {
+    void checkBridge(true);
+    const interval = window.setInterval(() => {
+      void checkBridge(false);
+    }, BRIDGE_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   async function handleFiles(files: FileList | File[]) {
     const nextBatch = await parseFiles([...files]);
@@ -66,6 +94,42 @@ export default function App() {
   async function loadSample() {
     const file = new File([sampleExport], "fm24-sample-export.html", { type: "text/html" });
     await handleFiles([file]);
+  }
+
+  async function checkBridge(autoLoad: boolean) {
+    try {
+      const status = await fetchJson<BridgeStatusResponse>("/api/status");
+      setBridgeStatus({ ...status, connected: true });
+
+      if (autoLoad && !bridgeAutoLoadedRef.current && status.playerCount && status.playerCount > 0 && !batch) {
+        bridgeAutoLoadedRef.current = true;
+        await loadBridgeData(false, false);
+      }
+    } catch {
+      setBridgeStatus({ connected: false, message: "Bridge server is not running" });
+    }
+  }
+
+  async function loadBridgeData(announce = true, rescan = true) {
+    if (rescan) {
+      await fetch("/api/rescan", { method: "POST" }).catch(() => undefined);
+    }
+
+    const nextBatch = await fetchJson<ImportBatch>("/api/batch");
+    setBatch(nextBatch);
+    setSelectedId((current) => current ?? nextBatch.players[0]?.id);
+    await checkBridge(false);
+
+    if (announce) {
+      setMessages((items) => [
+        ...items,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `Export Bridge에서 ${nextBatch.players.length}명의 선수를 동기화했습니다. FM에서 새로 export하면 다시 Sync를 누르거나 잠시 뒤 갱신할 수 있어요.`
+        }
+      ]);
+    }
   }
 
   function clearData() {
@@ -139,12 +203,34 @@ export default function App() {
                 }
               }}
             />
+            <div className={`bridge-card ${bridgeStatus.connected ? "connected" : "offline"}`}>
+              <div className="bridge-head">
+                <FolderSync size={17} />
+                <strong>{bridgeStatus.connected ? "Export Bridge" : "Bridge Offline"}</strong>
+              </div>
+              <p>
+                {bridgeStatus.connected
+                  ? `${bridgeStatus.sourceCount ?? 0} files · ${bridgeStatus.playerCount ?? 0} players`
+                  : bridgeStatus.message}
+              </p>
+              {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
+              <button
+                className="bridge-sync"
+                disabled={!bridgeStatus.connected}
+                onClick={() => void loadBridgeData()}
+              >
+                Sync Folder
+              </button>
+            </div>
             <div className="source-list">
               {(batch?.sourceNames ?? []).map((name) => (
                 <span key={name}>{name}</span>
               ))}
             </div>
             {batch?.warnings.map((warning) => (
+              <p className="warning" key={warning}>{warning}</p>
+            ))}
+            {bridgeStatus.warnings?.map((warning) => (
               <p className="warning" key={warning}>{warning}</p>
             ))}
           </section>
@@ -348,4 +434,13 @@ function filterPlayers(players: Player[], query: string): Player[] {
       .filter(Boolean)
       .some((value) => value!.toLowerCase().includes(q))
   );
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
 }

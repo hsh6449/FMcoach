@@ -3,7 +3,7 @@ import { existsSync, watch, type FSWatcher } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ImportBatch } from "../src/types/domain";
-import { readCoachResponse, writeCoachContext, type CoachContextRequest } from "../server/coachContext";
+import { readCoachResponse, writeCoachContext, writeDummyCoachResponse, type CoachContextRequest } from "../server/coachContext";
 import { scanExportFolder, type ExportFileInfo, type SourceBatch } from "../server/exportFolder";
 
 type AppConfig = {
@@ -96,6 +96,7 @@ function registerIpc() {
     targetBatch: state.targetBatch
   }));
   ipcMain.handle("fmCoach:readCoachResponse", () => readCoachResponse(coachContextDir()));
+  ipcMain.handle("fmCoach:writeDummyCoachResponse", () => writeDummyCoachResponse(coachContextDir()));
   ipcMain.handle("fmCoach:rescan", async () => {
     await scanExports();
     return statusPayload();

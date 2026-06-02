@@ -1260,6 +1260,76 @@ p {
   gap: 8px;
 }
 
+.session-console {
+  overflow: hidden;
+  border: 1px solid #1f3329;
+  border-radius: 8px;
+  background: #101812;
+  color: #dcebe1;
+}
+
+.console-top {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 10px;
+  border-bottom: 1px solid #263a2f;
+  background: #17231d;
+}
+
+.console-top strong {
+  color: #f1faf4;
+  font-size: 12px;
+}
+
+.console-top span {
+  color: #9ec8af;
+  font-size: 11px;
+}
+
+.console-lines {
+  max-height: 184px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.console-line {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.console-line span {
+  color: #74c796;
+}
+
+.console-line.codex span {
+  color: #8db6ff;
+}
+
+.console-line.file span {
+  color: #ffd27a;
+}
+
+.console-line.system span {
+  color: #9aa99f;
+}
+
+.console-line p {
+  min-width: 0;
+  margin: 0;
+  color: #dcebe1;
+  overflow-wrap: anywhere;
+}
+
 .codex-answer {
   display: grid;
   gap: 10px;

@@ -123,6 +123,59 @@ export async function readCoachResponse(contextDir: string): Promise<CoachContex
   }
 }
 
+export async function writeDummyCoachResponse(contextDir: string): Promise<CoachContextReadResult> {
+  const requestJsonPath = join(contextDir, "latest-request.json");
+  const responseJsonPath = join(contextDir, "latest-response.json");
+  const raw = await readFile(requestJsonPath, "utf8").catch(() => "");
+  const payload = raw ? JSON.parse(raw) as CoachContextPayload : undefined;
+  const topTarget = payload?.recruitment[0];
+  const mainNeed = payload?.report.needs[0];
+  const selected = payload?.selectedPlayer;
+  const answer = {
+    generatedAt: new Date().toISOString(),
+    title: selected ? `${selected.name} 역할 실험 리포트` : "더미 수석코치 리포트",
+    summary: topTarget
+      ? `${topTarget.candidate.name}이 현재 후보군 1순위입니다. ${topTarget.bestFit.roleName} 적합도 ${topTarget.bestFit.score}/20, 추천점수 ${topTarget.score}/20입니다.`
+      : mainNeed
+        ? `${mainNeed.area} 보강이 가장 먼저 보입니다. ${mainNeed.reason}`
+        : "현재 데이터 기준으로 큰 보강 리스크는 낮게 잡힙니다.",
+    verdict: topTarget ? "영입 추천" : "조건부 적합",
+    sections: [
+      {
+        heading: "파일 handoff 확인",
+        items: [
+          "앱이 latest-request.json/latest-request.md를 만들었습니다.",
+          "더미 응답 생성기가 latest-response.json을 썼고, 앱은 이 파일을 다시 읽어 렌더링할 수 있습니다."
+        ]
+      },
+      {
+        heading: "샘플 판단",
+        items: [
+          topTarget
+            ? `${topTarget.candidate.name}: ${topTarget.reasons.slice(0, 3).join(" / ")}`
+            : mainNeed
+              ? `[${mainNeed.severity}] ${mainNeed.area}: ${mainNeed.reason}`
+              : "스쿼드/후보 데이터가 더 들어오면 이 섹션이 구체화됩니다."
+        ]
+      }
+    ],
+    actions: [
+      "Codex 세션에서는 latest-request.md를 읽고 같은 JSON 형식으로 답하면 됩니다.",
+      "앱에서는 응답 파일 변경을 읽어 채팅 패널에 반영합니다."
+    ],
+    confidence: payload ? "보통" : "낮음"
+  };
+
+  await mkdir(contextDir, { recursive: true });
+  await writeFile(responseJsonPath, JSON.stringify(answer, null, 2), "utf8");
+
+  return {
+    ok: true,
+    responseJsonPath,
+    answer
+  };
+}
+
 function formatRequestMarkdown(payload: CoachContextPayload) {
   const selected = payload.selectedPlayer
     ? `${payload.selectedPlayer.name} (${payload.selectedPlayer.position || "포지션 미상"})`

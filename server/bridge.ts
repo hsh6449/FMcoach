@@ -5,7 +5,7 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ImportBatch } from "../src/types/domain";
-import { readCoachResponse, writeCoachContext, type CoachContextRequest } from "./coachContext";
+import { readCoachResponse, writeCoachContext, writeDummyCoachResponse, type CoachContextRequest } from "./coachContext";
 import { parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder";
 
 type BridgeState = {
@@ -110,6 +110,11 @@ async function route(request: IncomingMessage, response: ServerResponse) {
 
   if (url.pathname === "/api/coach-context/response") {
     sendJson(response, await readCoachResponse(contextDir));
+    return;
+  }
+
+  if (url.pathname === "/api/coach-context/dummy-response" && request.method === "POST") {
+    sendJson(response, await writeDummyCoachResponse(contextDir));
     return;
   }
 

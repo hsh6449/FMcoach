@@ -87,6 +87,12 @@ type CoachContextReadResult = {
   message?: string;
 };
 
+type SessionLine = {
+  id: string;
+  kind: "app" | "codex" | "file" | "system";
+  text: string;
+};
+
 export default function App() {
   const [batch, setBatch] = useState<ImportBatch | undefined>(() => loadBatch());
   const [activeView, setActiveView] = useState<AppView>("overview");
@@ -96,6 +102,9 @@ export default function App() {
   const [coachContextStatus, setCoachContextStatus] = useState("Codex 요청 파일을 만들 수 있습니다.");
   const [coachContextResult, setCoachContextResult] = useState<CoachContextWriteResult | undefined>();
   const [coachContextAnswer, setCoachContextAnswer] = useState<CoachContextAnswer | undefined>();
+  const [sessionLines, setSessionLines] = useState<SessionLine[]>([
+    { id: "session-ready", kind: "system", text: "Codex 세션 대기 중. 앱은 요청 파일을 만들고 응답 파일을 읽습니다." }
+  ]);
   const [templateCopied, setTemplateCopied] = useState(false);
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>({ connected: false, message: "Bridge not detected" });
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -302,9 +311,40 @@ export default function App() {
       setCoachContextResult(result);
       setCoachContextAnswer(undefined);
       setCoachContextStatus("요청 파일을 만들었습니다. Codex가 latest-request.md를 읽고 latest-response.json을 쓰면 됩니다.");
+      appendSessionLines([
+        { kind: "app", text: `request 생성: ${shortPath(result.requestMarkdownPath)}` },
+        { kind: "file", text: `Codex 입력 JSON: ${shortPath(result.requestJsonPath)}` },
+        { kind: "file", text: `Codex 응답 대상: ${shortPath(result.responseJsonPath)}` }
+      ]);
       setContextText("");
     } catch {
       setCoachContextStatus("요청 파일 생성 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
+      appendSessionLines([{ kind: "system", text: "요청 파일 생성 실패. Desktop 앱 또는 Bridge 서버 연결을 확인하세요." }]);
+    }
+  }
+
+  async function writeDummyResponse() {
+    try {
+      const result = window.fmCoach
+        ? await window.fmCoach.writeDummyCoachResponse()
+        : await fetchJson<CoachContextReadResult>("/api/coach-context/dummy-response", { method: "POST" });
+
+      const answer = result.answer as CoachContextAnswer | undefined;
+      if (result.ok && answer) {
+        setCoachContextAnswer(answer);
+        setCoachContextStatus("더미 Codex 응답을 생성하고 앱에 반영했습니다.");
+        appendSessionLines([
+          { kind: "codex", text: "dummy response 작성 완료" },
+          { kind: "file", text: `응답 파일: ${shortPath(result.responseJsonPath)}` }
+        ]);
+        return;
+      }
+
+      setCoachContextStatus(result.message ?? "더미 응답 생성에 실패했습니다.");
+      appendSessionLines([{ kind: "system", text: result.message ?? "더미 응답 생성 실패" }]);
+    } catch {
+      setCoachContextStatus("더미 응답 생성 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
+      appendSessionLines([{ kind: "system", text: "더미 응답 생성 실패. Desktop 앱 또는 Bridge 서버 연결을 확인하세요." }]);
     }
   }
 
@@ -314,16 +354,30 @@ export default function App() {
         ? await window.fmCoach.readCoachResponse()
         : await fetchJson<CoachContextReadResult>("/api/coach-context/response");
 
-      if (result.ok && result.answer) {
-        setCoachContextAnswer(result.answer);
+      const answer = result.answer as CoachContextAnswer | undefined;
+      if (result.ok && answer) {
+        setCoachContextAnswer(answer);
         setCoachContextStatus("Codex 응답을 앱에 반영했습니다.");
+        appendSessionLines([
+          { kind: "app", text: "latest-response.json 읽기 완료" },
+          { kind: "codex", text: answer.summary ?? answer.title ?? "응답이 앱에 반영되었습니다." }
+        ]);
         return;
       }
 
       setCoachContextStatus(result.message ?? "Codex 응답 파일을 아직 찾지 못했습니다.");
+      appendSessionLines([{ kind: "system", text: result.message ?? "Codex 응답 파일 대기 중" }]);
     } catch {
       setCoachContextStatus("응답 읽기 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
+      appendSessionLines([{ kind: "system", text: "응답 읽기 실패. Desktop 앱 또는 Bridge 서버 연결을 확인하세요." }]);
     }
+  }
+
+  function appendSessionLines(lines: Array<Omit<SessionLine, "id">>) {
+    setSessionLines((items) => [
+      ...items,
+      ...lines.map((line) => ({ ...line, id: crypto.randomUUID() }))
+    ].slice(-12));
   }
 
   function copyTemplateColumns() {
@@ -797,10 +851,28 @@ export default function App() {
                     <FileUp size={16} />
                     Codex 요청 생성
                   </button>
+                  <button className="secondary-button" disabled={!bridgeStatus.connected || !coachContextResult} onClick={() => void writeDummyResponse()}>
+                    <Sparkles size={16} />
+                    더미 응답
+                  </button>
                   <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void loadCoachContextResponse()}>
                     <RefreshCcw size={16} />
                     응답 불러오기
                   </button>
+                </div>
+                <div className="session-console" aria-label="Codex 세션 콘솔">
+                  <div className="console-top">
+                    <strong>codex session</strong>
+                    <span>{bridgeStatus.connected ? "file handoff ready" : "waiting for bridge"}</span>
+                  </div>
+                  <div className="console-lines">
+                    {sessionLines.map((line) => (
+                      <div className={`console-line ${line.kind}`} key={line.id}>
+                        <span>{consolePrompt(line.kind)}</span>
+                        <p>{line.text}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 {coachContextResult && (
                   <div className="handoff-result">
@@ -991,6 +1063,19 @@ function defaultCoachContextQuestion(selectedPlayer: Player | undefined): string
   }
 
   return "현재 스쿼드와 영입 후보 데이터 기준으로 전술/역할 구조와 다음 영입 우선순위를 분석해 주세요.";
+}
+
+function consolePrompt(kind: SessionLine["kind"]): string {
+  if (kind === "codex") return "codex";
+  if (kind === "file") return "file";
+  if (kind === "app") return "app";
+  return "sys";
+}
+
+function shortPath(path: string): string {
+  const marker = "coach-context/";
+  const index = path.lastIndexOf(marker);
+  return index >= 0 ? path.slice(index) : path;
 }
 
 function copyTextFallback(text: string) {

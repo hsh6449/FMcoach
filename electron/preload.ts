@@ -24,5 +24,6 @@ contextBridge.exposeInMainWorld("fmCoach", {
   getAllBatch: () => ipcRenderer.invoke("fmCoach:getAllBatch") as Promise<ImportBatch>,
   getStatus: () => ipcRenderer.invoke("fmCoach:getStatus") as Promise<DesktopStatus>,
   readCoachResponse: () => ipcRenderer.invoke("fmCoach:readCoachResponse") as Promise<CoachContextReadResult>,
-  rescan: () => ipcRenderer.invoke("fmCoach:rescan") as Promise<DesktopStatus>
+  rescan: () => ipcRenderer.invoke("fmCoach:rescan") as Promise<DesktopStatus>,
+  writeDummyCoachResponse: () => ipcRenderer.invoke("fmCoach:writeDummyCoachResponse") as Promise<CoachContextReadResult>
 });

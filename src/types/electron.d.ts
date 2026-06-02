@@ -26,6 +26,7 @@ declare global {
       getStatus: () => Promise<DesktopStatus>;
       readCoachResponse: () => Promise<CoachContextReadResult>;
       rescan: () => Promise<DesktopStatus>;
+      writeDummyCoachResponse: () => Promise<CoachContextReadResult>;
     };
   }
 }

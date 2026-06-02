@@ -1,7 +1,15 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { stat, unlink } from "node:fs/promises";
-import { ensureCoachContextDir, materializePlaybook, readCoachResponse, type CoachContextReadResult } from "./coachContext";
+import { copyFile, stat, unlink } from "node:fs/promises";
+import {
+  ensureCoachContextDir,
+  materializePlaybook,
+  readCoachResponseFile,
+  readLatestCoachPayload,
+  writeRunLog,
+  type CoachContextReadResult,
+  type CoachRunPaths
+} from "./coachContext";
 
 export type CodexRunInput = {
   contextDir: string;
@@ -22,6 +30,9 @@ export type CodexRunResult = {
   requestMarkdownPath: string;
   response?: CoachContextReadResult;
   responseJsonPath: string;
+  runDir?: string;
+  runId?: string;
+  runLogPath?: string;
   signal?: NodeJS.Signals | null;
   startedAt: string;
   stderr: string;
@@ -34,7 +45,16 @@ const bundledCodexPath = "/Applications/Codex.app/Contents/Resources/codex";
 
 export async function runCodexHandoff(input: CodexRunInput): Promise<CodexRunResult> {
   const setup = await ensureCoachContextDir(input.contextDir);
-  const requestExists = await stat(setup.requestMarkdownPath).then((info) => info.isFile()).catch(() => false);
+  const latestPayload = await readLatestCoachPayload(input.contextDir);
+  const activeRun = latestPayload?.run ?? {
+    id: "latest",
+    dir: input.contextDir,
+    logJsonPath: "",
+    requestJsonPath: setup.requestJsonPath,
+    requestMarkdownPath: setup.requestMarkdownPath,
+    responseJsonPath: setup.responseJsonPath
+  };
+  const requestExists = await stat(activeRun.requestMarkdownPath).then((info) => info.isFile()).catch(() => false);
   const startedAt = new Date();
 
   if (!requestExists) {
@@ -46,9 +66,12 @@ export async function runCodexHandoff(input: CodexRunInput): Promise<CodexRunRes
       durationMs: 0,
       finishedAt: startedAt.toISOString(),
       message: "latest-request.md가 없습니다. 먼저 Codex 요청을 생성해 주세요.",
-      requestJsonPath: setup.requestJsonPath,
-      requestMarkdownPath: setup.requestMarkdownPath,
-      responseJsonPath: setup.responseJsonPath,
+      requestJsonPath: activeRun.requestJsonPath,
+      requestMarkdownPath: activeRun.requestMarkdownPath,
+      responseJsonPath: activeRun.responseJsonPath,
+      runDir: activeRun.dir,
+      runId: activeRun.id,
+      runLogPath: activeRun.logJsonPath,
       startedAt: startedAt.toISOString(),
       stderr: "",
       stdout: ""
@@ -57,7 +80,13 @@ export async function runCodexHandoff(input: CodexRunInput): Promise<CodexRunRes
 
   const codexBin = resolveCodexBin();
   const playbookPath = await materializePlaybook(input.playbookPath, input.contextDir);
+  await writeActiveRunLog(activeRun, {
+    status: "running",
+    startedAt: startedAt.toISOString(),
+    message: "Codex CLI 실행 중"
+  });
   await unlink(setup.responseJsonPath).catch(() => undefined);
+  await unlink(activeRun.responseJsonPath).catch(() => undefined);
   const args = [
     "--ask-for-approval",
     "never",
@@ -77,15 +106,32 @@ export async function runCodexHandoff(input: CodexRunInput): Promise<CodexRunRes
   const run = await spawnCodex(codexBin, args, buildCodexPrompt({
     contextDir: input.contextDir,
     playbookPath,
-    requestJsonPath: setup.requestJsonPath,
-    requestMarkdownPath: setup.requestMarkdownPath,
-    responseJsonPath: setup.responseJsonPath
+    requestJsonPath: activeRun.requestJsonPath,
+    requestMarkdownPath: activeRun.requestMarkdownPath,
+    responseJsonPath: activeRun.responseJsonPath
   }));
   const finishedAt = new Date();
-  const response = await readCoachResponse(input.contextDir);
+  const response = await readCoachResponseFile(activeRun.responseJsonPath);
   const stdout = trimOutput(run.stdout);
   const stderr = trimOutput(run.stderr);
   const ok = run.exitCode === 0 && response.ok;
+  if (response.ok) {
+    await copyFile(activeRun.responseJsonPath, setup.responseJsonPath).catch(() => undefined);
+  }
+  await writeActiveRunLog(activeRun, {
+    command,
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    exitCode: run.exitCode,
+    finishedAt: finishedAt.toISOString(),
+    message: ok
+      ? "Codex CLI가 response.json을 작성했습니다."
+      : response.message ?? run.message ?? "Codex CLI 실행 결과를 확인해 주세요.",
+    signal: run.signal,
+    startedAt: startedAt.toISOString(),
+    status: ok ? "completed" : "failed",
+    stderr,
+    stdout
+  });
 
   return {
     ok,
@@ -96,17 +142,28 @@ export async function runCodexHandoff(input: CodexRunInput): Promise<CodexRunRes
     exitCode: run.exitCode,
     finishedAt: finishedAt.toISOString(),
     message: ok
-      ? "Codex CLI가 latest-response.json을 작성했습니다."
+      ? "Codex CLI가 response.json을 작성했고 latest-response.json에 반영했습니다."
       : response.message ?? run.message ?? "Codex CLI 실행 결과를 확인해 주세요.",
     requestJsonPath: setup.requestJsonPath,
     requestMarkdownPath: setup.requestMarkdownPath,
     response,
-    responseJsonPath: setup.responseJsonPath,
+    responseJsonPath: activeRun.responseJsonPath,
+    runDir: activeRun.dir,
+    runId: activeRun.id,
+    runLogPath: activeRun.logJsonPath,
     signal: run.signal,
     startedAt: startedAt.toISOString(),
     stderr,
     stdout
   };
+}
+
+async function writeActiveRunLog(run: CoachRunPaths, log: Parameters<typeof writeRunLog>[1]) {
+  if (!run.logJsonPath) {
+    return;
+  }
+
+  await writeRunLog(run, log);
 }
 
 function resolveCodexBin(): string {
@@ -142,10 +199,10 @@ function buildCodexPrompt(paths: {
     "Instructions:",
     "1. Read the playbook, markdown request, and JSON request before answering.",
     "2. Do not invent missing player traits, hidden attributes, tactical data, scouting data, CA, or PA.",
-    "3. Write exactly one valid JSON object to the response JSON target path. Follow the responseContract inside latest-request.json.",
+    "3. Write exactly one valid JSON object to the response JSON target path. Follow the responseContract inside the request JSON.",
     "4. Answer in Korean.",
     "5. Do not modify any file except the response JSON target.",
-    "6. After writing the file, finish with a single short sentence confirming that latest-response.json was written.",
+    "6. After writing the file, finish with a single short sentence confirming that the response JSON was written.",
     "",
     "This is not a mock response. The app will read the JSON file you write."
   ].join("\n");

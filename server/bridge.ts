@@ -5,7 +5,7 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ImportBatch } from "../src/types/domain";
-import { ensureCoachContextDir, readCoachResponse, writeCoachContext, type CoachContextRequest } from "./coachContext";
+import { ensureCoachContextDir, listCoachRuns, readCoachResponse, writeCoachContext, type CoachContextRequest } from "./coachContext";
 import { runCodexHandoff } from "./codexRunner";
 import { buildExportDataVersion, parseArgs, scanExportFolder, type ExportFileInfo } from "./exportFolder";
 
@@ -121,6 +121,11 @@ async function route(request: IncomingMessage, response: ServerResponse) {
 
   if (url.pathname === "/api/coach-context/response") {
     sendJson(response, await readCoachResponse(contextDir));
+    return;
+  }
+
+  if (url.pathname === "/api/coach-context/runs") {
+    sendJson(response, await listCoachRuns(contextDir));
     return;
   }
 

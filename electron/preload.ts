@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { ImportBatch } from "../src/types/domain";
-import type { CoachContextRequest, CoachContextReadResult, CoachContextSetupResult, CoachContextWriteResult } from "../server/coachContext";
+import type { CoachContextRequest, CoachContextReadResult, CoachContextSetupResult, CoachContextWriteResult, CoachRunSummary } from "../server/coachContext";
 import type { CodexRunResult } from "../server/codexRunner";
 
 export type DesktopStatus = {
@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("fmCoach", {
   getAllBatch: () => ipcRenderer.invoke("fmCoach:getAllBatch") as Promise<ImportBatch>,
   getCoachContextSetup: () => ipcRenderer.invoke("fmCoach:getCoachContextSetup") as Promise<CoachContextSetupResult>,
   getStatus: () => ipcRenderer.invoke("fmCoach:getStatus") as Promise<DesktopStatus>,
+  listCoachRuns: () => ipcRenderer.invoke("fmCoach:listCoachRuns") as Promise<{ ok: true; runs: CoachRunSummary[] }>,
   readCoachResponse: () => ipcRenderer.invoke("fmCoach:readCoachResponse") as Promise<CoachContextReadResult>,
   rescan: () => ipcRenderer.invoke("fmCoach:rescan") as Promise<DesktopStatus>,
   runCodexHandoff: () => ipcRenderer.invoke("fmCoach:runCodexHandoff") as Promise<CodexRunResult>

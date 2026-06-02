@@ -1331,6 +1331,101 @@ p {
   gap: 8px;
 }
 
+.coach-run-history {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e1e8e0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.history-head strong {
+  color: #26362e;
+  font-size: 13px;
+}
+
+.history-list {
+  max-height: 172px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.history-item {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #e1e8e0;
+  border-radius: 8px;
+  background: #f9fbf8;
+  text-align: left;
+}
+
+.history-item:hover,
+.history-item.active {
+  border-color: #8bd4b3;
+  background: #eef8f2;
+}
+
+.history-item span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.history-item strong,
+.history-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item strong {
+  color: #1f3028;
+  font-size: 12px;
+}
+
+.history-item small {
+  color: #6a786f;
+  font-size: 11px;
+}
+
+.history-item em,
+.history-empty {
+  color: #66746b;
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.history-item em.completed {
+  color: #176a4b;
+}
+
+.history-item em.failed {
+  color: #a24432;
+}
+
+.history-item em.running {
+  color: #9a651b;
+}
+
+.history-empty {
+  padding: 7px 2px;
+}
+
 .session-console {
   overflow: hidden;
   border: 1px solid #1f3329;

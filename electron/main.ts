@@ -3,7 +3,7 @@ import { existsSync, watch, type FSWatcher } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ImportBatch } from "../src/types/domain";
-import { ensureCoachContextDir, readCoachResponse, writeCoachContext, type CoachContextRequest } from "../server/coachContext";
+import { ensureCoachContextDir, listCoachRuns, readCoachResponse, writeCoachContext, type CoachContextRequest } from "../server/coachContext";
 import { runCodexHandoff } from "../server/codexRunner";
 import { buildExportDataVersion, scanExportFolder, type ExportFileInfo, type SourceBatch } from "../server/exportFolder";
 
@@ -100,6 +100,7 @@ function registerIpc() {
     targetBatch: state.targetBatch
   }));
   ipcMain.handle("fmCoach:getCoachContextSetup", () => ensureCoachContextDir(coachContextDir()));
+  ipcMain.handle("fmCoach:listCoachRuns", () => listCoachRuns(coachContextDir()));
   ipcMain.handle("fmCoach:readCoachResponse", () => readCoachResponse(coachContextDir()));
   ipcMain.handle("fmCoach:runCodexHandoff", () => runCodexHandoff({
     contextDir: coachContextDir(),

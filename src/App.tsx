@@ -69,10 +69,16 @@ type AppView = "overview" | "prepare" | "squad" | "player" | "reports" | "chat";
 type CoachContextWriteResult = {
   ok: true;
   contextDir: string;
+  latestRequestJsonPath?: string;
+  latestRequestMarkdownPath?: string;
+  latestResponseJsonPath?: string;
   requestJsonPath: string;
   requestMarkdownPath: string;
   responseJsonPath: string;
   generatedAt: string;
+  runDir?: string;
+  runId?: string;
+  runLogPath?: string;
 };
 
 type CoachContextAnswer = {
@@ -90,6 +96,27 @@ type CoachContextReadResult = {
   responseJsonPath: string;
   answer?: CoachContextAnswer;
   message?: string;
+  runDir?: string;
+  runId?: string;
+};
+
+type CoachRunSummary = {
+  answer?: unknown;
+  confidence?: string;
+  createdAt?: string;
+  finishedAt?: string;
+  logJsonPath: string;
+  mode?: string;
+  question?: string;
+  requestJsonPath: string;
+  requestMarkdownPath: string;
+  responseJsonPath: string;
+  runDir: string;
+  runId: string;
+  status: "requested" | "running" | "completed" | "failed";
+  summary?: string;
+  title?: string;
+  verdict?: string;
 };
 
 type CodexRunResult = {
@@ -105,6 +132,9 @@ type CodexRunResult = {
   requestMarkdownPath: string;
   response?: CoachContextReadResult;
   responseJsonPath: string;
+  runDir?: string;
+  runId?: string;
+  runLogPath?: string;
   signal?: string | null;
   startedAt: string;
   stderr: string;
@@ -130,6 +160,8 @@ export default function App() {
   const [coachContextStatus, setCoachContextStatus] = useState("Codex 요청 파일을 만들 수 있습니다.");
   const [coachContextResult, setCoachContextResult] = useState<CoachContextWriteResult | undefined>();
   const [coachContextAnswer, setCoachContextAnswer] = useState<CoachContextAnswer | undefined>();
+  const [coachRuns, setCoachRuns] = useState<CoachRunSummary[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string | undefined>();
   const [isCodexRunning, setIsCodexRunning] = useState(false);
   const [sessionLines, setSessionLines] = useState<SessionLine[]>([
     { id: "session-ready", kind: "system", text: "Codex 세션 대기 중. 앱은 요청 파일을 만들고 응답 파일을 읽습니다." }
@@ -205,6 +237,12 @@ export default function App() {
 
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (activeView === "chat" && bridgeStatus.connected) {
+      void loadCoachRuns();
+    }
+  }, [activeView, bridgeStatus.connected]);
 
   async function handleFiles(files: FileList | File[]) {
     const nextBatch = await parseFiles([...files]);
@@ -400,12 +438,14 @@ export default function App() {
 
       setCoachContextResult(result);
       setCoachContextAnswer(undefined);
+      setSelectedRunId(result.runId);
       setCoachContextStatus("요청 파일을 만들었습니다. 이제 실제 Codex CLI를 실행할 수 있습니다.");
       appendSessionLines([
         { kind: "app", text: `request 생성: ${shortPath(result.requestMarkdownPath)}` },
         { kind: "file", text: `Codex 입력 JSON: ${shortPath(result.requestJsonPath)}` },
         { kind: "file", text: `Codex 응답 대상: ${shortPath(result.responseJsonPath)}` }
       ]);
+      await loadCoachRuns();
       setContextText("");
     } catch {
       setCoachContextStatus("요청 파일 생성 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
@@ -437,11 +477,14 @@ export default function App() {
 
       if (result.ok && answer) {
         setCoachContextAnswer(answer);
+        setSelectedRunId(result.runId);
         setCoachContextStatus("Codex CLI가 latest-response.json을 쓰고 앱에 반영했습니다.");
+        await loadCoachRuns();
         return;
       }
 
       setCoachContextStatus(result.message ?? "Codex CLI 실행 결과를 확인해 주세요.");
+      await loadCoachRuns();
     } catch {
       setCoachContextStatus("Codex CLI 실행 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
       appendSessionLines([{ kind: "system", text: "Codex CLI 실행 실패. Desktop 앱 또는 Bridge 서버 연결을 확인하세요." }]);
@@ -459,11 +502,13 @@ export default function App() {
       const answer = result.answer as CoachContextAnswer | undefined;
       if (result.ok && answer) {
         setCoachContextAnswer(answer);
+        setSelectedRunId(result.runId);
         setCoachContextStatus("Codex 응답을 앱에 반영했습니다.");
         appendSessionLines([
           { kind: "app", text: "latest-response.json 읽기 완료" },
           { kind: "codex", text: answer.summary ?? answer.title ?? "응답이 앱에 반영되었습니다." }
         ]);
+        await loadCoachRuns();
         return;
       }
 
@@ -473,6 +518,45 @@ export default function App() {
       setCoachContextStatus("응답 읽기 실패: Desktop 앱이나 Bridge 서버 연결이 필요합니다.");
       appendSessionLines([{ kind: "system", text: "응답 읽기 실패. Desktop 앱 또는 Bridge 서버 연결을 확인하세요." }]);
     }
+  }
+
+  async function loadCoachRuns() {
+    if (!bridgeStatus.connected && !window.fmCoach) {
+      return;
+    }
+
+    try {
+      const result = window.fmCoach
+        ? await window.fmCoach.listCoachRuns()
+        : await fetchJson<{ ok: true; runs: CoachRunSummary[] }>("/api/coach-context/runs");
+      setCoachRuns(result.runs);
+    } catch {
+      appendSessionLines([{ kind: "system", text: "Codex 히스토리 목록을 읽지 못했습니다." }]);
+    }
+  }
+
+  function selectCoachRun(run: CoachRunSummary) {
+    setSelectedRunId(run.runId);
+    setCoachContextResult({
+      ok: true,
+      contextDir: bridgeStatus.contextDir ?? "",
+      generatedAt: run.createdAt ?? "",
+      requestJsonPath: run.requestJsonPath,
+      requestMarkdownPath: run.requestMarkdownPath,
+      responseJsonPath: run.responseJsonPath,
+      runDir: run.runDir,
+      runId: run.runId,
+      runLogPath: run.logJsonPath
+    });
+
+    if (run.answer) {
+      setCoachContextAnswer(run.answer as CoachContextAnswer);
+      setCoachContextStatus(`${runHistoryTitle(run)} 분석을 다시 열었습니다.`);
+      return;
+    }
+
+    setCoachContextAnswer(undefined);
+    setCoachContextStatus(run.status === "failed" ? "선택한 Codex 실행은 실패했습니다." : "선택한 요청은 아직 응답이 없습니다.");
   }
 
   function appendSessionLines(lines: Array<Omit<SessionLine, "id">>) {
@@ -989,6 +1073,32 @@ export default function App() {
                     응답 불러오기
                   </button>
                 </div>
+                <div className="coach-run-history">
+                  <div className="history-head">
+                    <strong>최근 분석</strong>
+                    <button className="mini-action-button" disabled={!bridgeStatus.connected} onClick={() => void loadCoachRuns()}>
+                      <RefreshCcw size={15} />
+                      새로고침
+                    </button>
+                  </div>
+                  <div className="history-list">
+                    {coachRuns.length === 0 ? (
+                      <span className="history-empty">아직 저장된 Codex 실행이 없습니다.</span>
+                    ) : coachRuns.map((run) => (
+                      <button
+                        className={`history-item ${selectedRunId === run.runId ? "active" : ""}`}
+                        key={run.runId}
+                        onClick={() => selectCoachRun(run)}
+                      >
+                        <span>
+                          <strong>{runHistoryTitle(run)}</strong>
+                          <small>{run.question ?? run.runId}</small>
+                        </span>
+                        <em className={run.status}>{runHistoryMeta(run)}</em>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="session-console" aria-label="Codex 세션 콘솔">
                   <div className="console-top">
                     <strong>codex session</strong>
@@ -1241,6 +1351,24 @@ function formatSyncTime(value?: string): string {
     month: "numeric",
     day: "numeric"
   });
+}
+
+function runHistoryTitle(run: CoachRunSummary): string {
+  return run.title ?? run.question ?? `Codex 분석 ${run.runId.slice(0, 12)}`;
+}
+
+function runHistoryMeta(run: CoachRunSummary): string {
+  const status = runStatusLabel(run.status);
+  const verdict = run.verdict ? ` · ${run.verdict}` : "";
+  const time = formatSyncTime(run.finishedAt ?? run.createdAt);
+  return `${status}${verdict} · ${time}`;
+}
+
+function runStatusLabel(status: CoachRunSummary["status"]): string {
+  if (status === "completed") return "완료";
+  if (status === "running") return "실행 중";
+  if (status === "failed") return "실패";
+  return "요청";
 }
 
 function defaultCoachContextQuestion(selectedPlayer: Player | undefined): string {

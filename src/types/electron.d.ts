@@ -1,5 +1,5 @@
 import type { ImportBatch } from "./domain";
-import type { CoachContextReadResult, CoachContextRequest, CoachContextSetupResult, CoachContextWriteResult } from "../../server/coachContext";
+import type { CoachContextReadResult, CoachContextRequest, CoachContextSetupResult, CoachContextWriteResult, CoachRunSummary } from "../../server/coachContext";
 import type { CodexRunResult } from "../../server/codexRunner";
 
 export type DesktopStatus = {
@@ -28,6 +28,7 @@ declare global {
       getAllBatch: () => Promise<ImportBatch>;
       getCoachContextSetup: () => Promise<CoachContextSetupResult>;
       getStatus: () => Promise<DesktopStatus>;
+      listCoachRuns: () => Promise<{ ok: true; runs: CoachRunSummary[] }>;
       readCoachResponse: () => Promise<CoachContextReadResult>;
       rescan: () => Promise<DesktopStatus>;
       runCodexHandoff: () => Promise<CodexRunResult>;

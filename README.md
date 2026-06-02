@@ -116,7 +116,8 @@ normalized squad/targets
   -> coach-context/latest-request.json
   -> coach-context/latest-request.md
   -> Codex reads the request and playbook
-  -> Codex writes coach-context/latest-response.json
+  -> Codex writes a run response.json
+  -> backend mirrors it to coach-context/latest-response.json
   -> app reads the response and renders it
 ```
 
@@ -127,11 +128,29 @@ This is intentionally file-based. The chat panel can run a real Codex CLI handof
 ```text
 app creates latest-request.md/json
   -> backend runs codex exec
-  -> Codex writes latest-response.json
-  -> app reads latest-response.json
+  -> Codex writes runs/<runId>/response.json
+  -> backend mirrors latest-response.json
+  -> app reads the active response
 ```
 
 If Codex is installed in a non-standard location, set `FM_COACH_CODEX_BIN=/path/to/codex`. This is the first terminal-connection experiment. A fuller embedded terminal/chat panel can wrap the same file protocol without changing the data contract.
+
+Every Codex request is also stored as a run:
+
+```text
+coach-context/
+  latest-request.json
+  latest-request.md
+  latest-response.json
+  runs/
+    20260602-080621-ed4a8488/
+      request.json
+      request.md
+      response.json
+      run-log.json
+```
+
+The `latest-*` files keep the current app flow simple. The `runs/*` folders preserve request history, responses, and execution logs so the app can reopen previous analyses.
 
 ## Data Sync Policy
 

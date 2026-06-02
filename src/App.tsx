@@ -1,8 +1,12 @@
 import {
   Activity,
+  AlertCircle,
+  BarChart3,
+  CheckCircle2,
   ClipboardList,
   Database,
   Dumbbell,
+  FileUp,
   Gauge,
   FolderOpen,
   FolderSync,
@@ -11,9 +15,11 @@ import {
   Search,
   Send,
   ShieldCheck,
+  Sparkles,
   Target,
   Trash2,
   Upload,
+  UserCheck,
   Users
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -66,7 +72,14 @@ export default function App() {
   const report = useMemo(() => buildCoachReport(players), [players]);
   const quality = useMemo(() => buildDataQualityReport(batch), [batch]);
   const selectedPlayer = players.find((player) => player.id === selectedId);
+  const selectedFits = selectedPlayer ? topFits(selectedPlayer, 3) : [];
   const filteredPlayers = useMemo(() => filterPlayers(players, query), [players, query]);
+  const hasPlayers = players.length > 0;
+  const visibleNeeds = hasPlayers ? report.needs : [];
+  const visibleTransferPriorities = hasPlayers ? report.transferPriorities : [];
+  const visibleTacticalNotes = hasPlayers ? report.tacticalNotes : [];
+  const mainNeed = visibleTransferPriorities[0] ?? visibleNeeds[0];
+  const lastSource = batch?.sourceNames.at(-1);
 
   useEffect(() => {
     if (batch) {
@@ -218,13 +231,22 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">FM24 Local Assistant</p>
-          <h1>FM Coach</h1>
+      <header className="app-header">
+        <div className="brand-block">
+          <div className="brand-mark" aria-hidden="true">
+            <UserCheck size={24} />
+          </div>
+          <div>
+            <p className="eyebrow">FM24 Local Assistant</p>
+            <h1>수석코치 데스크</h1>
+          </div>
         </div>
-        <div className="topbar-actions">
-          <button className="icon-button" title="샘플 데이터" onClick={loadSample}>
+        <div className="header-actions">
+          <StatusPill
+            connected={bridgeStatus.connected}
+            label={bridgeStatus.connected ? (window.fmCoach ? "Desktop 연결됨" : "Bridge 연결됨") : "수동 import"}
+          />
+          <button className="icon-button" title="샘플 데이터 불러오기" onClick={loadSample}>
             <Database size={18} />
           </button>
           <button className="icon-button" title="데이터 비우기" onClick={clearData}>
@@ -233,16 +255,24 @@ export default function App() {
         </div>
       </header>
 
-      <main className="workspace">
-        <aside className="rail">
-          <section className="panel import-panel">
-            <div className="panel-title">
+      <main className="coach-desk">
+        <section className="command-center">
+          <div className="command-copy">
+            <div className="panel-title compact">
               <FolderOpen size={18} />
-              <h2>Import</h2>
+              <h2>데이터 가져오기</h2>
             </div>
-            <button className="upload-zone" onClick={() => fileInputRef.current?.click()}>
-              <Upload size={22} />
-              <span>FM24 HTML/TXT</span>
+            <strong>{hasPlayers ? `${players.length}명의 선수단 데이터가 준비됐습니다` : "FM24 export를 기다리고 있습니다"}</strong>
+            <span>
+              {hasPlayers
+                ? lastSource ?? "로컬에 저장된 선수단 데이터를 사용 중입니다"
+                : "HTML, TXT, CSV export 또는 지정한 export 폴더를 사용할 수 있습니다"}
+            </span>
+          </div>
+          <div className="command-actions">
+            <button className="primary-button" onClick={() => fileInputRef.current?.click()}>
+              <FileUp size={18} />
+              파일 선택
             </button>
             <input
               ref={fileInputRef}
@@ -257,223 +287,267 @@ export default function App() {
                 }
               }}
             />
-            <div className={`bridge-card ${bridgeStatus.connected ? "connected" : "offline"}`}>
-              <div className="bridge-head">
-                <FolderSync size={17} />
-                <strong>{bridgeStatus.connected ? (window.fmCoach ? "Desktop Bridge" : "Export Bridge") : "Bridge Offline"}</strong>
-              </div>
-              <p>
-                {bridgeStatus.connected
-                  ? `${bridgeStatus.sourceCount ?? 0} squad files · ${bridgeStatus.squadPlayerCount ?? bridgeStatus.playerCount ?? 0} squad players · ${bridgeStatus.targetPlayerCount ?? 0} targets`
-                  : bridgeStatus.message}
-              </p>
-              {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
-              <div className="bridge-actions">
-                {window.fmCoach && (
-                  <button className="bridge-sync" onClick={() => void chooseExportFolder()}>
-                    Choose Folder
-                  </button>
-                )}
-                <button
-                  className="bridge-sync"
-                  disabled={!bridgeStatus.connected}
-                  onClick={() => void loadBridgeData()}
-                >
-                  Sync Folder
-                </button>
-              </div>
-            </div>
-            <div className="source-list">
-              {(batch?.sourceNames ?? []).map((name) => (
-                <span key={name}>{name}</span>
-              ))}
-            </div>
-            {batch?.warnings.map((warning) => (
-              <p className="warning" key={warning}>{warning}</p>
-            ))}
-            {bridgeStatus.warnings?.map((warning) => (
-              <p className="warning" key={warning}>{warning}</p>
-            ))}
-          </section>
-
-          <section className="panel metric-panel">
-            <div className="panel-title">
-              <ShieldCheck size={18} />
-              <h2>Squad</h2>
-            </div>
-            <div className="metric-grid">
-              <Metric label="Players" value={players.length} />
-              <Metric label="Best XI" value={report.bestXi.length} />
-              <Metric label="Needs" value={report.needs.length} />
-              <Metric label="Files" value={batch?.sourceNames.length ?? 0} />
-            </div>
-          </section>
-
-          <section className="panel quality-panel">
-            <div className="panel-title">
-              <Gauge size={18} />
-              <h2>Data Quality</h2>
-            </div>
-            <div className={`quality-score ${quality.status}`}>
-              <strong>{quality.score}</strong>
-              <span>{quality.status}</span>
-            </div>
-            <p className="quality-note">
-              {quality.playerCount} players · {quality.averageAttributesPerPlayer} attrs/player
-            </p>
-            <div className="quality-list">
-              {[...quality.warnings, ...quality.recommendations].slice(0, 4).map((item) => (
-                <p key={item}>{item}</p>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel context-panel">
-            <div className="panel-title">
-              <Activity size={18} />
-              <h2>Context</h2>
-            </div>
-            <select value={selectedId ?? ""} onChange={(event) => setSelectedId(event.target.value || undefined)}>
-              <option value="">No player</option>
-              {players.map((player) => (
-                <option key={player.id} value={player.id}>{player.name}</option>
-              ))}
-            </select>
-            <div className="quick-actions">
-              <button onClick={() => askAssistant("이 선수 훈련 뭐가 좋아?")}>훈련</button>
-              <button onClick={() => askAssistant("이 선수 역할은?")}>역할</button>
-              <button onClick={() => askAssistant("보강 우선순위는?")}>영입</button>
-            </div>
-          </section>
-        </aside>
-
-        <section className="main-stage">
-          <div className="toolbar">
-            <div className="search-field">
-              <Search size={17} />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="선수, 포지션, 국적 검색" />
-            </div>
-            <button className="soft-button" onClick={() => setQuery("")}>
-              <RefreshCcw size={16} />
-              Reset
+            {window.fmCoach && (
+              <button className="secondary-button" onClick={() => void chooseExportFolder()}>
+                <FolderOpen size={18} />
+                폴더 선택
+              </button>
+            )}
+            <button className="secondary-button" disabled={!bridgeStatus.connected} onClick={() => void loadBridgeData()}>
+              <FolderSync size={18} />
+              동기화
             </button>
           </div>
-
-          <div className="player-table-wrap">
-            <table className="player-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Pos</th>
-                  <th>Age</th>
-                  <th>Best Role</th>
-                  <th>Score</th>
-                  <th>Condition</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPlayers.map((player) => {
-                  const fit = topFits(player, 1)[0];
-                  return (
-                    <tr
-                      key={player.id}
-                      className={player.id === selectedId ? "selected" : ""}
-                      onClick={() => setSelectedId(player.id)}
-                    >
-                      <td>{player.name}</td>
-                      <td>{player.position || "-"}</td>
-                      <td>{player.age ?? "-"}</td>
-                      <td>{fit.roleName}</td>
-                      <td>{fit.score}</td>
-                      <td>{player.condition ? `${player.condition}%` : "-"}</td>
-                      <td>{player.value ?? "-"}</td>
-                    </tr>
-                  );
-                })}
-                {filteredPlayers.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="empty-cell">No players loaded</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="report-grid">
-            <ReportPanel icon={<Target size={18} />} title="Role Fits">
-              {report.topRoleFits.slice(0, 5).map(({ player, fits }) => (
-                <div className="report-line" key={player.id}>
-                  <strong>{player.name}</strong>
-                  <span>{fits[0].roleName} · {fits[0].score}/20</span>
-                </div>
-              ))}
-            </ReportPanel>
-            <ReportPanel icon={<Dumbbell size={18} />} title="Training">
-              {report.training.slice(0, 5).map((item) => (
-                <div className="report-line" key={item.player.id}>
-                  <strong>{item.player.name}</strong>
-                  <span>{item.focus}</span>
-                </div>
-              ))}
-            </ReportPanel>
-            <ReportPanel icon={<Users size={18} />} title="Recruitment">
-              {report.transferPriorities.slice(0, 5).map((need) => (
-                <div className="report-line" key={need.area}>
-                  <strong>{need.area}</strong>
-                  <span>{need.severity}</span>
-                </div>
-              ))}
-            </ReportPanel>
-            <ReportPanel icon={<ClipboardList size={18} />} title="Tactics">
-              {report.tacticalNotes.slice(0, 4).map((note) => (
-                <p className="note" key={note}>{note}</p>
-              ))}
-            </ReportPanel>
+          <div className={`bridge-strip ${bridgeStatus.connected ? "connected" : "offline"}`}>
+            <span>
+              <FolderSync size={16} />
+              {bridgeStatus.connected ? `${bridgeStatus.sourceCount ?? 0}개 파일` : bridgeStatusLabel(bridgeStatus.message)}
+            </span>
+            <span>{bridgeStatus.squadPlayerCount ?? bridgeStatus.playerCount ?? players.length}명 선수단</span>
+            <span>{bridgeStatus.targetPlayerCount ?? 0}명 영입 후보</span>
+            {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
           </div>
         </section>
 
-        <aside className="chat-panel">
-          <div className="panel-title">
-            <MessageSquare size={18} />
-            <h2>Coach Chat</h2>
-          </div>
-          <div className="chat-log">
-            {messages.map((message) => (
-              <div className={`bubble ${message.role}`} key={message.id}>
-                {message.content.split("\n").map((line) => (
-                  <p key={line}>{line}</p>
+        <section className="summary-grid">
+          <Metric icon={<Users size={18} />} label="선수단" value={players.length} helper="로드된 선수" />
+          <Metric icon={<ShieldCheck size={18} />} label="Best XI" value={report.bestXi.length} helper="분석 가능 인원" />
+          <Metric icon={<Gauge size={18} />} label="품질 점수" value={quality.score} helper={qualityStatusLabel(quality.status)} />
+          <Metric icon={<Target size={18} />} label="보강 이슈" value={visibleNeeds.length} helper={mainNeed?.area ?? "대기 중"} />
+        </section>
+
+        <div className="desk-grid">
+          <section className="main-column">
+            <section className="panel squad-board">
+              <div className="section-head">
+                <div>
+                  <div className="panel-title compact">
+                    <BarChart3 size={18} />
+                    <h2>선수단 보드</h2>
+                  </div>
+                  <p>{hasPlayers ? `${filteredPlayers.length}명을 보고 있습니다` : "선수단 데이터를 불러오면 표가 채워집니다"}</p>
+                </div>
+                <div className="toolbar">
+                  <div className="search-field">
+                    <Search size={17} />
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="선수, 포지션, 국적 검색"
+                    />
+                  </div>
+                  <button className="icon-button" title="검색 초기화" onClick={() => setQuery("")}>
+                    <RefreshCcw size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="player-table-wrap">
+                <table className="player-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Pos</th>
+                      <th>Age</th>
+                      <th>Best Role</th>
+                      <th>Score</th>
+                      <th>Condition</th>
+                      <th>Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPlayers.map((player) => {
+                      const fit = topFits(player, 1)[0];
+                      return (
+                        <tr
+                          key={player.id}
+                          className={player.id === selectedId ? "selected" : ""}
+                          onClick={() => setSelectedId(player.id)}
+                        >
+                          <td>
+                            <strong>{player.name}</strong>
+                            <span>{player.club ?? player.nationality ?? ""}</span>
+                          </td>
+                          <td>{player.position || "-"}</td>
+                          <td>{player.age ?? "-"}</td>
+                          <td>{fit.roleName}</td>
+                          <td>{fit.score}</td>
+                          <td>{player.condition ? `${player.condition}%` : "-"}</td>
+                          <td>{player.value ?? "-"}</td>
+                        </tr>
+                      );
+                    })}
+                    {filteredPlayers.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="empty-cell">
+                          <div className="empty-state">
+                            <Upload size={24} />
+                            <strong>선수단 데이터가 없습니다</strong>
+                            <button className="secondary-button" onClick={loadSample}>
+                              <Database size={18} />
+                              샘플 보기
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <div className="report-grid">
+              <ReportPanel icon={<Target size={18} />} title="역할 적합도">
+                {report.topRoleFits.slice(0, 5).map(({ player, fits }) => (
+                  <div className="report-line" key={player.id}>
+                    <strong>{player.name}</strong>
+                    <span>{fits[0].roleName} · {fits[0].score}/20</span>
+                  </div>
+                ))}
+                {report.topRoleFits.length === 0 && <p className="muted">역할 분석 대기 중</p>}
+              </ReportPanel>
+              <ReportPanel icon={<Dumbbell size={18} />} title="훈련 포커스">
+                {report.training.slice(0, 5).map((item) => (
+                  <div className="report-line" key={item.player.id}>
+                    <strong>{item.player.name}</strong>
+                    <span>{item.focus}</span>
+                  </div>
+                ))}
+                {report.training.length === 0 && <p className="muted">훈련 제안 대기 중</p>}
+              </ReportPanel>
+              <ReportPanel icon={<Users size={18} />} title="보강 우선순위">
+                {visibleTransferPriorities.slice(0, 5).map((need) => (
+                  <div className="report-line" key={need.area}>
+                    <strong>{need.area}</strong>
+                    <span>{need.severity} · {need.reason}</span>
+                  </div>
+                ))}
+                {visibleTransferPriorities.length === 0 && <p className="muted">보강 진단 대기 중</p>}
+              </ReportPanel>
+              <ReportPanel icon={<ClipboardList size={18} />} title="전술 메모">
+                {visibleTacticalNotes.slice(0, 4).map((note) => (
+                  <p className="note" key={note}>{note}</p>
+                ))}
+                {visibleTacticalNotes.length === 0 && <p className="muted">전술 메모 대기 중</p>}
+              </ReportPanel>
+            </div>
+          </section>
+
+          <aside className="side-column">
+            <section className="panel player-focus">
+              <div className="panel-title compact">
+                <Activity size={18} />
+                <h2>선택 선수</h2>
+              </div>
+              <select value={selectedId ?? ""} onChange={(event) => setSelectedId(event.target.value || undefined)}>
+                <option value="">선택 없음</option>
+                {players.map((player) => (
+                  <option key={player.id} value={player.id}>{player.name}</option>
+                ))}
+              </select>
+              {selectedPlayer ? (
+                <div className="player-card">
+                  <h3>{selectedPlayer.name}</h3>
+                  <p>{selectedPlayer.position || "포지션 미상"} · {selectedPlayer.age ? `${selectedPlayer.age}세` : "나이 미상"}</p>
+                  <div className="mini-grid">
+                    <span>컨디션 <strong>{selectedPlayer.condition ? `${selectedPlayer.condition}%` : "-"}</strong></span>
+                    <span>평점 <strong>{selectedPlayer.averageRating ?? "-"}</strong></span>
+                  </div>
+                  <div className="fit-list">
+                    {selectedFits.map((fit) => (
+                      <div className="fit-row" key={fit.roleId}>
+                        <span>{fit.roleName}</span>
+                        <strong>{fit.score}/20</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="muted">선수 상세 대기 중</p>
+              )}
+              <div className="quick-actions">
+                <button disabled={!hasPlayers} onClick={() => askAssistant("이 선수 훈련 뭐가 좋아?")}>훈련</button>
+                <button disabled={!hasPlayers} onClick={() => askAssistant("이 선수 역할은?")}>역할</button>
+                <button disabled={!hasPlayers} onClick={() => askAssistant("보강 우선순위는?")}>영입</button>
+              </div>
+            </section>
+
+            <section className="panel quality-panel">
+              <div className="section-head simple">
+                <div className="panel-title compact">
+                  <Gauge size={18} />
+                  <h2>데이터 품질</h2>
+                </div>
+                {quality.status === "good" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+              </div>
+              <div className={`quality-score ${quality.status}`}>
+                <strong>{quality.score}</strong>
+                <span>{qualityStatusLabel(quality.status)}</span>
+              </div>
+              <div className="quality-meter" aria-hidden="true">
+                <span style={{ width: `${quality.score}%` }} />
+              </div>
+              <p className="quality-note">
+                {quality.playerCount}명 · 평균 능력치 {quality.averageAttributesPerPlayer}개
+              </p>
+              <div className="quality-list">
+                {[...quality.warnings, ...quality.recommendations].slice(0, 4).map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+                {batch?.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+                {bridgeStatus.warnings?.map((warning) => (
+                  <p key={warning}>{warning}</p>
                 ))}
               </div>
-            ))}
-          </div>
-          <form
-            className="chat-input"
-            onSubmit={(event) => {
-              event.preventDefault();
-              askAssistant();
-            }}
-          >
-            <textarea
-              value={contextText}
-              onChange={(event) => setContextText(event.target.value)}
-              placeholder={selectedPlayer ? `${selectedPlayer.name}에게 물어보기` : "수석코치에게 물어보기"}
-            />
-            <button className="send-button" title="보내기">
-              <Send size={18} />
-            </button>
-          </form>
-        </aside>
+            </section>
+
+            <section className="panel chat-panel">
+              <div className="panel-title compact">
+                <MessageSquare size={18} />
+                <h2>코치 대화</h2>
+              </div>
+              <div className="chat-log">
+                {messages.map((message) => (
+                  <div className={`bubble ${message.role}`} key={message.id}>
+                    {message.content.split("\n").map((line) => (
+                      <p key={line}>{line}</p>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <form
+                className="chat-input"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  askAssistant();
+                }}
+              >
+                <textarea
+                  value={contextText}
+                  onChange={(event) => setContextText(event.target.value)}
+                  placeholder={selectedPlayer ? `${selectedPlayer.name}에게 물어보기` : "수석코치에게 물어보기"}
+                />
+                <button className="send-button" title="보내기">
+                  <Send size={18} />
+                </button>
+              </form>
+            </section>
+          </aside>
+        </div>
       </main>
     </div>
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ icon, label, value, helper }: { icon: ReactNode; label: string; value: number; helper: string }) {
   return (
     <div className="metric">
+      <div>{icon}</div>
       <span>{label}</span>
       <strong>{value}</strong>
+      <small>{helper}</small>
     </div>
   );
 }
@@ -488,6 +562,41 @@ function ReportPanel({ icon, title, children }: { icon: ReactNode; title: string
       <div className="report-content">{children}</div>
     </section>
   );
+}
+
+function StatusPill({ connected, label }: { connected: boolean; label: string }) {
+  return (
+    <span className={`status-pill ${connected ? "connected" : "offline"}`}>
+      {connected ? <CheckCircle2 size={15} /> : <Sparkles size={15} />}
+      {label}
+    </span>
+  );
+}
+
+function qualityStatusLabel(status: ReturnType<typeof buildDataQualityReport>["status"]): string {
+  if (status === "good") {
+    return "좋음";
+  }
+  if (status === "partial") {
+    return "보정 필요";
+  }
+  if (status === "poor") {
+    return "낮음";
+  }
+  return "대기";
+}
+
+function bridgeStatusLabel(message?: string): string {
+  if (!message) {
+    return "Bridge 연결 대기";
+  }
+  if (message.includes("not running")) {
+    return "Bridge 미실행";
+  }
+  if (message.includes("not detected")) {
+    return "Bridge 감지 안 됨";
+  }
+  return message;
 }
 
 function loadBatch(): ImportBatch | undefined {

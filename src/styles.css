@@ -233,6 +233,12 @@ button {
   color: #f4f1e8;
 }
 
+.bridge-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 7px;
+}
+
 .bridge-sync:disabled {
   cursor: not-allowed;
   color: #777160;

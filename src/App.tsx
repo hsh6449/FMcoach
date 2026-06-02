@@ -97,6 +97,21 @@ export default function App() {
   }
 
   async function checkBridge(autoLoad: boolean) {
+    if (window.fmCoach) {
+      try {
+        const status = await window.fmCoach.getStatus();
+        setBridgeStatus({ ...status, connected: true, message: "Desktop app" });
+
+        if (autoLoad && !bridgeAutoLoadedRef.current && status.playerCount > 0 && !batch) {
+          bridgeAutoLoadedRef.current = true;
+          await loadBridgeData(false, false);
+        }
+      } catch {
+        setBridgeStatus({ connected: false, message: "Desktop bridge is not ready" });
+      }
+      return;
+    }
+
     try {
       const status = await fetchJson<BridgeStatusResponse>("/api/status");
       setBridgeStatus({ ...status, connected: true });
@@ -111,6 +126,29 @@ export default function App() {
   }
 
   async function loadBridgeData(announce = true, rescan = true) {
+    if (window.fmCoach) {
+      if (rescan) {
+        const status = await window.fmCoach.rescan();
+        setBridgeStatus({ ...status, connected: true, message: "Desktop app" });
+      }
+
+      const nextBatch = await window.fmCoach.getBatch();
+      setBatch(nextBatch);
+      setSelectedId((current) => current ?? nextBatch.players[0]?.id);
+
+      if (announce) {
+        setMessages((items) => [
+          ...items,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `Export 폴더에서 ${nextBatch.players.length}명의 선수를 동기화했습니다. FM에서 새로 export하면 Sync Folder를 누르면 됩니다.`
+          }
+        ]);
+      }
+      return;
+    }
+
     if (rescan) {
       await fetch("/api/rescan", { method: "POST" }).catch(() => undefined);
     }
@@ -130,6 +168,16 @@ export default function App() {
         }
       ]);
     }
+  }
+
+  async function chooseExportFolder() {
+    if (!window.fmCoach) {
+      return;
+    }
+
+    const status = await window.fmCoach.chooseExportFolder();
+    setBridgeStatus({ ...status, connected: true, message: "Desktop app" });
+    await loadBridgeData(true, false);
   }
 
   function clearData() {
@@ -206,7 +254,7 @@ export default function App() {
             <div className={`bridge-card ${bridgeStatus.connected ? "connected" : "offline"}`}>
               <div className="bridge-head">
                 <FolderSync size={17} />
-                <strong>{bridgeStatus.connected ? "Export Bridge" : "Bridge Offline"}</strong>
+                <strong>{bridgeStatus.connected ? (window.fmCoach ? "Desktop Bridge" : "Export Bridge") : "Bridge Offline"}</strong>
               </div>
               <p>
                 {bridgeStatus.connected
@@ -214,13 +262,20 @@ export default function App() {
                   : bridgeStatus.message}
               </p>
               {bridgeStatus.watchDir && <span className="bridge-path">{bridgeStatus.watchDir}</span>}
-              <button
-                className="bridge-sync"
-                disabled={!bridgeStatus.connected}
-                onClick={() => void loadBridgeData()}
-              >
-                Sync Folder
-              </button>
+              <div className="bridge-actions">
+                {window.fmCoach && (
+                  <button className="bridge-sync" onClick={() => void chooseExportFolder()}>
+                    Choose Folder
+                  </button>
+                )}
+                <button
+                  className="bridge-sync"
+                  disabled={!bridgeStatus.connected}
+                  onClick={() => void loadBridgeData()}
+                >
+                  Sync Folder
+                </button>
+              </div>
             </div>
             <div className="source-list">
               {(batch?.sourceNames ?? []).map((name) => (

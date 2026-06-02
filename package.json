@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist-electron/main.cjs",
+  "productName": "FM Coach",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run build:electron",
+    "build:electron": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --target=node20 --format=cjs --external:electron --outdir=dist-electron --out-extension:.js=.cjs",
     "preview": "vite preview --host 0.0.0.0",
     "bridge": "tsx server/bridge.ts",
     "coach": "tsx server/coachCli.ts",
-    "start": "npm run build && npm run bridge"
+    "start": "npm run build && npm run bridge",
+    "desktop": "npm run build && electron dist-electron/main.cjs",
+    "package:mac": "npm run build && electron-builder --mac dir"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.1",
@@ -22,7 +27,26 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "electron": "^42.3.0",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.0",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3"
+  },
+  "build": {
+    "appId": "local.fmcoach.app",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "samples/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": "dir",
+      "category": "public.app-category.sports"
+    }
   }
 }

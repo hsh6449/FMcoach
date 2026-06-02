@@ -26,6 +26,21 @@ npm run dev
 
 Vite will print a local URL, usually `http://localhost:5174`.
 
+For the desktop app:
+
+```bash
+npm run desktop
+```
+
+For a macOS app bundle:
+
+```bash
+npm run package:mac
+open release/mac-arm64/FM\ Coach.app
+```
+
+The desktop app does not need a separate browser or bridge server. Use `Choose Folder` in the app to point it at your FM24 export folder.
+
 For the export-folder workflow, build the app and run the bridge server:
 
 ```bash

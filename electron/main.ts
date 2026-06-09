@@ -57,7 +57,10 @@ app.whenReady().then(async () => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      return;
     }
+
+    revealMainWindow();
   });
 });
 
@@ -75,6 +78,7 @@ function createWindow() {
     height: 860,
     minWidth: 1060,
     minHeight: 720,
+    show: false,
     title: "FM Coach",
     backgroundColor: "#151513",
     webPreferences: {
@@ -84,10 +88,38 @@ function createWindow() {
     }
   });
 
+  mainWindow.once("ready-to-show", () => {
+    revealMainWindow();
+  });
+
+  mainWindow.webContents.once("did-finish-load", () => {
+    revealMainWindow();
+  });
+
+  setTimeout(() => {
+    revealMainWindow();
+  }, 1000);
+
   void mainWindow.loadFile(indexPath).catch((error) => {
     console.error(`Failed to load FM Coach renderer from ${indexPath}:`, error);
     void mainWindow?.loadURL(fallbackErrorPage(indexPath, error));
   });
+}
+
+function revealMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+  if (process.platform === "darwin") {
+    app.focus({ steal: true });
+  }
 }
 
 function registerIpc() {

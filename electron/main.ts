@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
 import { existsSync, watch, type FSWatcher } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { resolve, join } from "node:path";
 import type { ImportBatch } from "../src/types/domain";
 import { ensureCoachContextDir, listCoachRuns, readCoachResponse, writeCoachContext, type CoachContextRequest } from "../server/coachContext";
 import { runCodexHandoff } from "../server/codexRunner";
@@ -69,6 +69,7 @@ app.on("window-all-closed", () => {
 });
 
 function createWindow() {
+  const indexPath = rendererIndexPath();
   mainWindow = new BrowserWindow({
     width: 1320,
     height: 860,
@@ -79,11 +80,14 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: join(app.getAppPath(), "dist-electron", "preload.cjs")
+      preload: preloadPath()
     }
   });
 
-  void mainWindow.loadFile(join(app.getAppPath(), "dist", "index.html"));
+  void mainWindow.loadFile(indexPath).catch((error) => {
+    console.error(`Failed to load FM Coach renderer from ${indexPath}:`, error);
+    void mainWindow?.loadURL(fallbackErrorPage(indexPath, error));
+  });
 }
 
 function registerIpc() {
@@ -105,7 +109,7 @@ function registerIpc() {
   ipcMain.handle("fmCoach:runCodexHandoff", () => runCodexHandoff({
     contextDir: coachContextDir(),
     playbookPath: coachPlaybookPath(),
-    workspaceDir: app.getAppPath()
+    workspaceDir: coachContextDir()
   }));
   ipcMain.handle("fmCoach:rescan", async () => {
     await scanExports();
@@ -204,7 +208,11 @@ function coachContextDir(): string {
 
 function coachPlaybookPath(): string {
   const resourcesPath = join(process.resourcesPath, "docs", "AI_COACH_PLAYBOOK.md");
-  return existsSync(resourcesPath) ? resourcesPath : join(app.getAppPath(), "docs", "AI_COACH_PLAYBOOK.md");
+  return firstExistingPath([
+    resourcesPath,
+    join(appRoot(), "docs", "AI_COACH_PLAYBOOK.md"),
+    join(process.cwd(), "docs", "AI_COACH_PLAYBOOK.md")
+  ]);
 }
 
 async function loadConfig(): Promise<AppConfig> {
@@ -229,4 +237,58 @@ async function saveConfig(config: AppConfig) {
 
 function configPath(): string {
   return join(app.getPath("userData"), "config.json");
+}
+
+function appRoot(): string {
+  return firstExistingPath([
+    resolve(__dirname, ".."),
+    app.getAppPath(),
+    process.cwd()
+  ], (candidate) => existsSync(join(candidate, "dist", "index.html")));
+}
+
+function rendererIndexPath(): string {
+  return join(appRoot(), "dist", "index.html");
+}
+
+function preloadPath(): string {
+  return join(appRoot(), "dist-electron", "preload.cjs");
+}
+
+function firstExistingPath(paths: string[], predicate: (path: string) => boolean = existsSync): string {
+  return paths.find((path) => predicate(path)) ?? paths[0];
+}
+
+function fallbackErrorPage(indexPath: string, error: unknown): string {
+  const html = [
+    "<!doctype html>",
+    "<html>",
+    "<head>",
+    "<meta charset=\"utf-8\" />",
+    "<title>FM Coach load error</title>",
+    "<style>",
+    "body{margin:0;min-height:100vh;display:grid;place-items:center;background:#151513;color:#f7fbf6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}",
+    "main{width:min(720px,calc(100vw - 48px));padding:24px;border:1px solid #33443a;border-radius:8px;background:#1f2a23}",
+    "h1{margin:0 0 10px;font-size:22px}p{line-height:1.5;color:#c7d4cb}code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#111914;border-radius:8px;color:#dcebe1}",
+    "</style>",
+    "</head>",
+    "<body>",
+    "<main>",
+    "<h1>FM Coach could not load the app UI</h1>",
+    "<p>Run <code>npm run build</code> and start the desktop app again. If this keeps happening, check the renderer path below.</p>",
+    `<code>${escapeHtml(indexPath)}\n\n${escapeHtml(String(error))}</code>`,
+    "</main>",
+    "</body>",
+    "</html>"
+  ].join("");
+
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
